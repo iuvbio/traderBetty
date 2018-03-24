@@ -16,8 +16,16 @@ MYCOINS = ["USD", "EUR", "USDT", "BCH", "DASH", "ETC", "ETH", "LTC", "BTC", "XRP
            "STEEM", "SKY"]
 
 
-class Wrapper():
+class Trader():
     def __init__(self, api_path, wallets):
+        """
+        The API path should be a directory containing a directory for each exchange which contains a key file
+        named after the exchange as well.
+        Wallets is a json file containing containing a dictionary with the wallet names as keys for another dictionary
+        with the currencies as keys and the corresponding balance as value.
+        :param api_path:
+        :param wallets:
+        """
         self.c = CurrencyRates()
         self.coins = MYCOINS
         self.DATA_PATH = "data"
@@ -28,22 +36,19 @@ class Wrapper():
             "Kraken": {
                 "Client": ccxt.kraken(),
                 "Currencies": [],
-                "Symbols": [],
-                "dataKey": "info"
+                "Symbols": []
             },
 
             "Bitfinex": {
                 "Client": ccxt.bitfinex(),
                 "Currencies": [],
-                "Symbols": [],
-                "dataKey": "total"
+                "Symbols": []
             },
 
             "Bitstamp": {
                 "Client": ccxt.bitstamp(),
                 "Currencies": [],
-                "Symbols": [],
-                "dataKey": None
+                "Symbols": []
             },
 
             "Cryptopia": {
@@ -56,8 +61,7 @@ class Wrapper():
             "Binance": {
                 "Client": ccxt.binance(),
                 "Currencies": [],
-                "Symbols": [],
-                "dataKey": None
+                "Symbols": []
             }
 
         }
@@ -68,6 +72,8 @@ class Wrapper():
         self._initiate_clients()
         self._update_currencies()
         self._update_symbols()
+        self._make_coindf()
+        self._match_symbols()
 
     # method for creating the coindf, should only be run once
     def _make_coindf(self):
@@ -123,6 +129,7 @@ class Wrapper():
                 self.coindf[exchange, "Quote_Symbols"].loc[coin] = coinqsymbols
 
     def _update_balances(self):
+        # TODO: Solve the err_rate_limit error on Bitfinex
         for exchange in self.exchanges:
             balance = self.get_balance(exchange, hide_zero=False)
             for coin in self.coindf.index:
@@ -254,3 +261,28 @@ class Wrapper():
 
     def store_coindf(self):
         self.coindf.to_csv("%s/coindf.csv" % self.DATA_PATH, sep=";")
+
+    def calc_spread(self, price, price_b=None):
+        if price_b:
+            prices = [price, price_b]
+        else:
+            prices = price
+        max_p = max(prices)
+        min_p = min(prices)
+        spread = max_p - min_p
+        spread_p = spread / min_p
+
+        return {"buy_price": min_p, "sell_price": max_p, "spread": spread, "spread_p": spread_p}
+
+    def calc_profit(self, exchange, price1, price2, fee, volume=1, buy_curr="EUR", sell_curr="USD"):
+        # Buy x BTC at price1 and apply trading fee
+        cost = volume * price1
+        cost += cost * fee
+        # Sell x BTC at price 2 and apply trading fee
+        income = volume * price2
+        income -= income * fee
+        # Convert to base currency and apply conversion surcharge
+        rincome = income * self.convert_to_x(exchange, sell_curr, buy_curr)
+        profit = rincome - cost
+
+        return profit
