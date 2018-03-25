@@ -4,7 +4,6 @@ Wrapper for trading on different crypto exchanges using the ccxt library
 """
 
 import ccxt
-import time
 import json
 
 import pandas as pd
@@ -141,111 +140,95 @@ class Trader():
                     coinbal = 0
                 self.coindf[exchange, "Balance"].loc[coin] = coinbal
 
+        total_balances = []
+        for coin in self.coindf.index:
+            total_balances.append(self.coindf.loc[coin][:, "Balance"].sum())
+        self.coindf["Total_Balance"] = total_balances
+
     def update_EUR_balance(self):
         usdrate = self.c.get_rate("USD", "EUR")
         btceurprices = self.get_all_ex_lp("BTC", "EUR")
-        btcrate = list(self.get_best_price(btceurprices).values())[0]
+        btcrate = btceurprices[0][1]
         for coin in self.coindf.index:
-            eurprices = self.get_all_ex_lp(coin, "EUR")
-            usdprices = self.get_all_ex_lp(coin, "USD")
-            btcprices = self.get_all_ex_lp(coin, "BTC")
-            bestprice = self.convert_to_EUR(coin)
-            for exchange in self.exchanges:
-                if exchange in eurprices.keys():
-                    price = eurprices[exchange]
-                elif exchange in usdprices.keys():
-                    price = usdprices[exchange] * usdrate
-                elif exchange in btcprices.keys():
-                    price = btcprices[exchange] * btcrate
+            if self.coindf["Total_Balance"].loc[coin] > 0:
+                eurprices = self.get_all_ex_lp(coin, "EUR")
+                if eurprices:
+                    bestprice = eurprices[0][1]
+                    usdprices = None
+                    btcprices = None
                 else:
-                    price = bestprice
+                    usdprices = self.get_all_ex_lp(coin, "USD")
+                    if usdprices:
+                        bestprice = usdprices[0][1] * usdrate
+                        btcprices = None
+                    else:
+                        btcprices = self.get_all_ex_lp(coin, "BTC")
+                        if btcprices:
+                            bestprice = btcprices[0][1] * btcrate
+                        else:
+                            bestprice = 0
 
-                if price:
-                    coinbal = self.coindf[exchange, "Balance"].loc[coin] * price
+                for exchange in self.exchanges:
+                    coinbal = self.coindf[exchange, "Balance"].loc[coin]
+                    if coinbal > 0:
+                        price = bestprice
+                        if eurprices:
+                            eurprices = dict(eurprices)
+                            if exchange in eurprices.keys():
+                                price = eurprices[exchange]
+                        elif usdprices:
+                            usdprices = dict(usdprices)
+                            if exchange in usdprices.keys():
+                                price = usdprices[exchange] * usdrate
+                        elif btcprices:
+                            btcprices = dict(btcprices)
+                            if exchange in btcprices.keys():
+                                price = btcprices[exchange] * btcrate
+                        else:
+                            pass
+
+                        convbal = coinbal * price
+
+                    else:
+                        convbal = 0
+
+                    self.coindf[exchange, "EUR_Balance"].loc[coin] = convbal
+
+        total_balances = []
+        for coin in self.coindf.index:
+            total_balances.append(self.coindf.loc[coin][:, "EUR_Balance"].sum())
+        self.coindf["Total_EUR_Balance"] = total_balances
+
+    def convert_to_EUR(self, base, volume=1):
+        # TODO: fully implement logic to get EUR price (USDT and exchange's own coin)
+        eurprices = self.get_all_ex_lp(base, "EUR")
+        if eurprices:
+            price = eurprices[0][1]
+        else:
+            usdprices = self.get_all_ex_lp(base, "USD")
+            if usdprices:
+                usdrate = self.c.get_rate("USD", "EUR")
+                price = usdprices[0][1]
+                price *= usdrate
+            else:
+                btcprices = self.get_all_ex_lp(base, "BTC")
+                btceurprices = self.get_all_ex_lp("BTC", "EUR")
+                btcrate = btceurprices[0][1]
+                if btcprices:
+                    price = btcprices[0][1]
+                    price *= btcrate
                 else:
-                    coinbal = 0
+                    price = None
 
-                self.coindf[exchange, "EUR_Balance"].loc[coin] = coinbal
+        if price:
+            amt = volume * price
+        else:
+            print("%s cannot be exchanged for either EUR, nor USD, nor BTC on any exchange." % base)
+            amt = 0
 
-        # if exchange == "Bitfinex":
-        #     time.sleep(2)
+        return amt
 
     # methods that can be called for individual exchanges
-    def convert_to_EUR(self, base, volume=1, exchange=None):
-        """
-        Convert an arbitrary amount of a certain currency to Euro.
-
-        1. If the symbol BASE/EUR exists on the original exchange, use that price for the conversion.
-        2. Else check if BASE/EUR is available on another exchange, if it is use that price for the conversion.
-        3. Else if BASE/EUR is not available on another exchange either, check if BASE/USD is available on the
-           original exchange. If it is, use that price to convert to USD, then convert to EUR.
-        4. Else check BASE/USDT for original exchange.
-        5. Else check BASE/USD for other exchanges.
-        6. Else check BASE/USDT for other exchanges.
-        3. Else if neither BASE/EUR nor BASE/USD nor BASE/USDT is not available on another exchange either,
-           check if BASE/BTC is available on the original exchange. If it is, use that price to convert BASE to BTC.
-           3.1 Check if BTC/EUR is available on the original exchange and convert using that price.
-           3.2 If it isn't, check if BTC/USD or BTC/USDT are available on original exchange and convert using that
-               price.
-           3.3 If neither BTC/EUR nor BTC/USD nor BTC/USDT is available on the original exchange
-             3.3.1
-
-        :param exchange: The exchange the holding is on
-        :param base: The base currency that is to be converted
-        :param volume: The amount that should be converted
-        :return:
-        """
-
-        # TODO: fully implement logic to get EUR price (USDT and exchange's own coin)
-        # first look for EUR price on original exchange, then the others
-        eurprices = self.get_all_ex_lp(base, "EUR")
-        if exchange:
-            if eurprices and exchange in eurprices.keys():
-                price = eurprices[exchange]
-            else:
-                usdprices = self.get_all_ex_lp(base, "USD")
-                if usdprices and exchange in usdprices.keys():
-                    usdrate = self.c.get_rate("USD", "EUR")
-                    price = usdprices[exchange]
-                    price *= usdrate
-                else:
-                    btcprices = self.get_all_ex_lp(base, "BTC")
-                    btceurprices = self.get_all_ex_lp("BTC", "EUR")
-                    btcrate = list(self.get_best_price(btceurprices).values())[0]
-                    if btcprices and exchange in btcprices:
-                        price = btcprices[exchange]
-                        price *= btcrate
-                    else:
-                        price = None
-
-        else:
-            if eurprices:
-                price = list(self.get_best_price(eurprices).values())[0]
-            else:
-                usdprices = self.get_all_ex_lp(base, "USD")
-                # second look for USD price on original exchange, then others
-                if usdprices:
-                    usdrate = self.c.get_rate("USD", "EUR")
-                    price = list(self.get_best_price(usdprices).values())[0]
-                    price *= usdrate
-                else:
-                    btcprices = self.get_all_ex_lp(base, "BTC")
-                    btceurprices = self.get_all_ex_lp("BTC", "EUR")
-                    btcrate = list(self.get_best_price(btceurprices).values())[0]
-                    if btcprices:
-                        price = list(self.get_best_price(btcprices).values())[0]
-                        price *= btcrate
-                    else:
-                        price = None
-        if price:
-            return volume * price
-        else:
-            if exchange:
-                print("No conversion is possible on %s" % exchange)
-            else:
-                print("%s cannot be exchanged for either EUR, nor USD, nor BTC on any exchange." % base)
-            return price
-
     def get_balance(self, exchange, total=True, hide_zero=True, verbose=False):
         client = self.exchanges[exchange]["Client"]
 
@@ -277,13 +260,18 @@ class Trader():
         client = self.exchanges[exchange]["Client"]
         print(client.fetch_order_book(symbol))
 
-    def get_best_order(self, exchange, symbol):
+    def get_best_order(self, exchange, symbol, *bidask):
         client = self.exchanges[exchange]["Client"]
         orderbook = client.fetch_order_book(symbol)
         bid = orderbook['bids'][0][0] if len(orderbook['bids']) > 0 else None
         ask = orderbook['asks'][0][0] if len(orderbook['asks']) > 0 else None
         spread = (ask - bid) if (bid and ask) else None
         print(exchange, 'market price', {'bid': bid, 'ask': ask, 'spread': spread})
+
+        if bidask == "bid":
+            return bid
+        elif bidask == "ask":
+            return ask
 
     # not exchange specific callable methods
     def get_all_ex_lp(self, base, quote, exchanges=None):
@@ -298,13 +286,16 @@ class Trader():
                 lp = self.get_ticker(ex, symbol)
                 prices[ex] = lp
 
+        prices = sorted(prices.items(), key=lambda x: x[1], reverse=True)
+
         return prices
 
-    def get_best_price(self, prices):
-        best_ex = max(prices, key=lambda key: prices[key])
-        bestprice = {best_ex: prices[best_ex]}
+    def get_best_price(self, base, quote):
+        prices = self.get_all_ex_lp(base, quote)
+        bestex = prices[0][0]
+        bestprice = prices[0][1]
 
-        return bestprice
+        return (bestex, bestprice)
 
     def store_coindf(self):
         self.coindf.to_csv("%s/coindf.csv" % self.DATA_PATH, sep=";")
@@ -329,7 +320,7 @@ class Trader():
         income = volume * price2
         income -= income * fee
         # Convert to base currency and apply conversion surcharge
-        rincome = income * self.convert_to_x(exchange, sell_curr, buy_curr)
+        rincome = income * self.get_best_price(sell_curr, buy_curr)
         profit = rincome - cost
 
         return profit
