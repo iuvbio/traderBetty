@@ -82,7 +82,7 @@ class Trader():
     def _make_coindf(self):
         # TODO: asign columns Withdrawal_Fee, Deposit_Fee, Precision, Limit_Max, Limit_Min
         exchanges = [ex for ex in self.exchanges.keys()]
-        columns = ["Coin", "Base_Symbols", "Quote_Symbols", "Withdrawal_Fee", "Deposit_Fee", "Precision",
+        columns = ["Base_Symbols", "Quote_Symbols", "Withdrawal_Fee", "Deposit_Fee", "Precision",
                    "Limit_Max", "Limit_Min", "Balance", "EUR_Balance"]
         index = pd.MultiIndex.from_product([exchanges, columns], names=["Exchanges", "Columns"])
         df = pd.DataFrame(None, index=self.coins, columns=index)
@@ -122,12 +122,13 @@ class Trader():
                 coinbsymbols = []
                 coinqsymbols = []
                 for symbol in self.exchanges[exchange]["Symbols"]:
-                    base = client.market(symbol).get("base")
-                    quote = client.market(symbol).get("quote")
+                    market = client.market(symbol)
+                    base = market.get("base")
+                    quote = market.get("quote")
                     if base == coin:
-                        coinbsymbols.append(client.market(symbol).get("symbol"))
+                        coinbsymbols.append(market.get("symbol"))
                     if quote == coin:
-                        coinqsymbols.append(client.market(symbol).get("symbol"))
+                        coinqsymbols.append(market.get("symbol"))
                 self.coindf[exchange, "Base_Symbols"].loc[coin] = coinbsymbols
                 self.coindf[exchange, "Quote_Symbols"].loc[coin] = coinqsymbols
 
@@ -233,18 +234,29 @@ class Trader():
         client = self.exchanges[exchange]["Client"]
         print(client.fetch_order_book(symbol))
 
-    def get_best_order(self, exchange, symbol, *bidask):
+    def get_best_order(self, exchange, symbol, verbose=False):
         client = self.exchanges[exchange]["Client"]
         orderbook = client.fetch_order_book(symbol)
         bid = orderbook['bids'][0][0] if len(orderbook['bids']) > 0 else None
         ask = orderbook['asks'][0][0] if len(orderbook['asks']) > 0 else None
         spread = (ask - bid) if (bid and ask) else None
-        print(exchange, 'market price', {'bid': bid, 'ask': ask, 'spread': spread})
 
-        if bidask == "bid":
-            return bid
-        elif bidask == "ask":
-            return ask
+        if verbose:
+            print(exchange, 'market price', {'bid': bid, 'ask': ask, 'spread': "%.2f%%" % spread})
+
+        return {"bid": bid, "ask": ask}
+
+    def get_fee(self, exchange, coin, quote="BTC"):
+        symbol = coin + "/" + quote
+        client = self.exchanges[exchange]["Client"]
+        try:
+            market = client.market(symbol)
+            fee = market.get("taker")
+        except ccxt.ExchangeError:
+            print("Symbol not available on %s" % exchange)
+            fee = None
+
+        return fee
 
     # not exchange specific callable methods
     def get_all_ex_lp(self, base, quote, exchanges=None):
@@ -263,12 +275,27 @@ class Trader():
 
         return prices
 
-    def get_best_price(self, base, quote):
-        prices = self.get_all_ex_lp(base, quote)
+    def get_best_price(self, base, quote, exchanges=None):
+        prices = self.get_all_ex_lp(base, quote, exchanges=exchanges)
         bestex = prices[0][0]
         bestprice = prices[0][1]
 
         return (bestex, bestprice)
+
+    def get_all_ex_bid_ask(self, base, quote, exchanges=None):
+        symbol = base + "/" + quote
+        if not exchanges:
+            exchanges = self.exchanges.keys()
+
+        orders = {}
+        for ex in exchanges:
+            exbase_symbols = self.coindf[ex, "Base_Symbols"].loc[base]
+            # exquote_symbols = self.coindf[ex, "Base_Symbols"].loc[base]
+            if symbol in exbase_symbols:
+                orders[ex] = self.get_best_order(ex, symbol)
+
+        return orders
+
 
     def convert_to_EUR(self, base, volume=1):
         # TODO: fully implement logic to get EUR price (USDT and exchange's own coin)
@@ -310,19 +337,16 @@ class Trader():
     def store_coindf(self):
         self.coindf.to_csv("%s/coindf.csv" % self.DATA_PATH, sep=";")
 
-    def calc_spread(self, price, price_b=None):
-        if price_b:
-            prices = [price, price_b]
-        else:
-            prices = price
+    def calc_spread(self, price1, price2):
+        prices = [price1, price2]
         max_p = max(prices)
         min_p = min(prices)
         spread = max_p - min_p
-        spread_p = spread / min_p
+        spread_rate = spread / min_p
 
-        return {"buy_price": min_p, "sell_price": max_p, "spread": spread, "spread_p": spread_p}
+        return {"buy_price": min_p, "sell_price": max_p, "spread": spread, "spread_p": spread_rate}
 
-    def calc_profit(self, exchange, price1, price2, fee, volume=1, buy_curr="EUR", sell_curr="USD"):
+    def calc_profit(self, price1, price2, volume=1, buy_curr="EUR", sell_curr="USD"):
         # Buy x BTC at price1 and apply trading fee
         cost = volume * price1
         cost += cost * fee
@@ -330,7 +354,12 @@ class Trader():
         income = volume * price2
         income -= income * fee
         # Convert to base currency and apply conversion surcharge
-        rincome = income * self.get_best_price(sell_curr, buy_curr)
+        rincome = income * self.c.get_rate(sell_curr, buy_curr)
         profit = rincome - cost
 
         return profit
+
+    def get_portfolio_value(self, quote="EUR"):
+        if quote == "EUR":
+            total = self.coindf["Total_EUR_Balance"].sum()
+            return total
