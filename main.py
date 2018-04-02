@@ -76,7 +76,7 @@ class Trader():
         self._make_coindf()
         self._match_symbols()
         self._update_balances()
-        self._update_EUR_balance()
+        self._update_eur_balance()
 
     # method for creating the coindf, should only be run once
     def _make_coindf(self):
@@ -148,7 +148,7 @@ class Trader():
             total_balances.append(self.coindf.loc[coin][:, "Balance"].sum())
         self.coindf["Total_Balance"] = total_balances
 
-    def _update_EUR_balance(self):
+    def _update_eur_balance(self):
         usdrate = self.c.get_rate("USD", "EUR")
         btceurprices = self.get_all_ex_lp("BTC", "EUR")
         btcrate = btceurprices[0][1]
@@ -296,8 +296,23 @@ class Trader():
 
         return orders
 
+    def get_best_ask(self, base, quote, exchanges=None):
+        orders = self.get_all_ex_bid_ask(base, quote, exchanges=exchanges)
+        orders = sorted(orders.items(), key=lambda x: x[1]["ask"])
+        bestex = orders[0][0]
+        bestask = orders[0][1]["ask"]
 
-    def convert_to_EUR(self, base, volume=1):
+        return (bestex, bestask)
+
+    def get_best_bid(self, base, quote, exchanges=None):
+        orders = self.get_all_ex_bid_ask(base, quote, exchanges=exchanges)
+        orders = sorted(orders.items(), key=lambda x: x[1]["bid"], reverse=True)
+        bestex = orders[0][0]
+        bestbid = orders[0][1]["bid"]
+
+        return (bestex, bestbid)
+
+    def convert_to_eur(self, base, volume=1):
         # TODO: fully implement logic to get EUR price (USDT and exchange's own coin)
         eurprices = self.get_all_ex_lp(base, "EUR")
         if eurprices:
