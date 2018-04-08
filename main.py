@@ -361,16 +361,15 @@ class Trader():
 
         return {"buy_price": min_p, "sell_price": max_p, "spread": spread, "spread_p": spread_rate}
 
-    def calc_profit(self, price1, price2, volume=1, buy_curr="EUR", sell_curr="USD"):
+    def calc_profit(self, price_buy, price_sell, fee1, fee2, volume=1):
         # Buy x BTC at price1 and apply trading fee
-        cost = volume * price1
-        cost += cost * fee
+        cost = volume * price_buy
+        cost += cost * fee1
         # Sell x BTC at price 2 and apply trading fee
-        income = volume * price2
-        income -= income * fee
+        income = volume * price_sell
+        income -= income * fee2
         # Convert to base currency and apply conversion surcharge
-        rincome = income * self.c.get_rate(sell_curr, buy_curr)
-        profit = rincome - cost
+        profit = income - cost
 
         return profit
 
@@ -378,3 +377,38 @@ class Trader():
         if quote == "EUR":
             total = self.coindf["Total_EUR_Balance"].sum()
             return total
+
+    def get_arb_data(self, base, quote1="EUR", quote2="USD"):
+        if quote1 == "EUR" and quote2 == "USD":
+            convrate = self.c.get_rate("USD", "EUR")
+        else:
+            convrate = self.get_best_bid(quote2, quote1)[1]
+
+        bidask1 = self.get_all_ex_bid_ask(base, quote1)
+        bidask2 = self.get_all_ex_bid_ask(base, quote2)
+
+        convdict = {}
+        for exchange in bidask1.keys():
+            if exchange in bidask2.keys():
+                convdict[exchange] = {
+                    "ask": bidask2[exchange]["ask"] * convrate,
+                    "bid": bidask2[exchange]["bid"] * convrate
+                }
+
+                asks = sorted([(quote1, bidask1[exchange]["ask"]), (quote2, convdict[exchange]["ask"])], key=lambda x: x[1])
+                bids = sorted([(quote1, bidask1[exchange]["bid"]), (quote2, convdict[exchange]["bid"])], key=lambda x: x[1],
+                              reverse=True)
+                spread = bids[0][1] - asks[0][1]
+                spread_rate = spread / asks[0][1]
+                buyfee = self.get_fee(exchange, base, quote=asks[0][0])
+                sellfee = self.get_fee(exchange, base, quote=bids[0][0])
+                profit = self.calc_profit(asks[0][1], bids[0][1], buyfee, sellfee)
+
+                # TODO: Get precision to print with currency and exchange specific decimals
+                if asks[0][0] != bids[0][0]:
+                    print("Possible arbitrage on %s\n"
+                          "Buy in %s price: %.2f\n"
+                          "Sell in %s price: %.2f\n"
+                          "Spread: %.2f %.2f%%\n"
+                          "Profit: %.5f\n" %
+                          (exchange, asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
