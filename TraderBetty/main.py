@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Wrapper for trading on different crypto exchanges using the ccxt library
+Main executable
 """
 
 import time
 import sys
-import TraderBetty.betty as tb
+from .betty import Trader as Tb
 
 
-betty = tb.Trader(input("API Path: "), input("Wallet file: "))
+betty = Tb(input("API Path: "), input("Wallet file: "))
 
 
 def main(sleeptime=10):

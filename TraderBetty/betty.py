@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Wrapper for trading on different crypto exchanges using the ccxt library
-"""
 
 import ccxt
 import json
