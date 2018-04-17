@@ -48,6 +48,7 @@ class Trader():
             with open(wallets, "r") as f:
                 self.wallets = json.load(f)
 
+        self._initiate_markets()
         self._update_currencies()
         self._update_symbols()
         self._make_coindf()
@@ -71,17 +72,6 @@ class Trader():
     # methods that get called at initiation, not exchange specific
     def _initiate_markets(self):
         for exchange in self.exchanges:
-            # with open("%s/%s/ccxt_%s.key" % (self.API_PATH, exchange, exchange.lower())) as f:
-            #     key = f.readline().strip()
-            #     secret = f.readline().strip()
-            #     userid = f.readline().strip()
-            #
-            # self.exchanges[exchange]["Client"].apiKey = key
-            # self.exchanges[exchange]["Client"].secret = secret
-            #
-            # if exchange == "Bitstamp":
-            #     self.exchanges[exchange]["Client"].uid = userid
-
             self.exchanges[exchange]["Client"].load_markets()
 
     def _update_currencies(self):
