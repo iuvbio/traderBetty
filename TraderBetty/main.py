@@ -12,7 +12,7 @@ from TraderBetty.TraderBetty.betty import Trader as Tb
 here = os.path.abspath("TraderBetty/TraderBetty")
 root = os.path.dirname(here)
 config = os.path.join(root, "config.ini")
-keys_file = os.path.join(os.path.dirname(root), "APIs/keys.json")
+keys_file = os.path.join(root, "keys.json")
 
 betty = Tb(config_path=config, api_path=keys_file)
 

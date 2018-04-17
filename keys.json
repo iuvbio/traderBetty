@@ -1,7 +1,23 @@
 {
-    "binance":    {},
-    "bitfinex":   {},
-    "bitstamp":   {},
-    "cryptopia":  {},
-    "kraken":     {}
+    "binance":    {
+        "apiKey": None,
+        "secret": None
+    },
+    "bitfinex":   {
+        "apiKey": None,
+        "secret": None
+    },
+    "bitstamp":   {
+        "apiKey": None,
+        "secret": None,
+        "uid": None
+    },
+    "cryptopia":  {
+        "apiKey": None,
+        "secret": None
+    },
+    "kraken":     {
+        "apiKey": None,
+        "secret": None
+    }
 }
