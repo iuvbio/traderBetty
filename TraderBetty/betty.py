@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 
-import ccxt
+import os
 import json
+import ccxt
 
 import pandas as pd
+from configparser import ConfigParser
 from forex_python.converter import CurrencyRates
 
 IDX = pd.IndexSlice
-MYCOINS = ["USD", "EUR", "USDT", "BCH", "DASH", "ETC", "ETH", "LTC", "BTC", "XRP", "IOTA", "GNT", "POWR", "QSP",
-           "QTUM", "UBQ", "BTS", "ADA", "GRC", "XVG", "ETN", "MCO", "DOGE", "CANN", "NEO", "OMG", "XLM", "XMR",
-           "STEEM", "SKY"]
 
 
 class Trader():
-    def __init__(self, api_path, wallets=None):
+    def __init__(self, config_path, api_path, wallets=None):
         """
         The API path should be a directory containing a directory for each exchange which contains a key file
         named after the exchange as well.
@@ -22,45 +21,26 @@ class Trader():
         :param api_path:
         :param wallets:
         """
+        config = ConfigParser()
+        config.read(config_path)
+        self.coins = config.get("main", "coins").split(",")
+        self.exchanges = {ex: {} for ex in config.get("main", "exchanges").split(",")}
         self.c = CurrencyRates()
-        self.coins = MYCOINS
         self.DATA_PATH = "data"
         self.API_PATH = api_path
 
-        self.exchanges = {
+        # check if the path is to a valid file
+        if not os.path.isfile(config_path) or not os.path.isfile(api_path):
+            raise ValueError
+        # load the api keys from config
+        with open(api_path) as file:
+            keys = json.load(file)
 
-            "Kraken": {
-                "Client": ccxt.kraken(),
-                "Currencies": [],
-                "Symbols": []
-            },
-
-            "Bitfinex": {
-                "Client": ccxt.bitfinex(),
-                "Currencies": [],
-                "Symbols": []
-            },
-
-            "Bitstamp": {
-                "Client": ccxt.bitstamp(),
-                "Currencies": [],
-                "Symbols": []
-            },
-
-            "Cryptopia": {
-                "Client": ccxt.cryptopia(),
-                "Currencies": [],
-                "Symbols": [],
-                "dataKey": "Data"
-            },
-
-            "Binance": {
-                "Client": ccxt.binance(),
-                "Currencies": [],
-                "Symbols": []
-            }
-
-        }
+        for id in keys:
+            exchange = getattr(ccxt, id)
+            exchange_config = {}
+            exchange_config.update(keys[id])
+            self.exchanges[id]["Client"] = exchange(exchange_config)
 
         self.last_prices = {}
 
@@ -68,7 +48,6 @@ class Trader():
             with open(wallets, "r") as f:
                 self.wallets = json.load(f)
 
-        self._initiate_clients()
         self._update_currencies()
         self._update_symbols()
         self._make_coindf()
@@ -90,18 +69,18 @@ class Trader():
         self.coindf = df
 
     # methods that get called at initiation, not exchange specific
-    def _initiate_clients(self):
+    def _initiate_markets(self):
         for exchange in self.exchanges:
-            with open("%s/%s/ccxt_%s.key" % (self.API_PATH, exchange, exchange.lower())) as f:
-                key = f.readline().strip()
-                secret = f.readline().strip()
-                userid = f.readline().strip()
-
-            self.exchanges[exchange]["Client"].apiKey = key
-            self.exchanges[exchange]["Client"].secret = secret
-
-            if exchange == "Bitstamp":
-                self.exchanges[exchange]["Client"].uid = userid
+            # with open("%s/%s/ccxt_%s.key" % (self.API_PATH, exchange, exchange.lower())) as f:
+            #     key = f.readline().strip()
+            #     secret = f.readline().strip()
+            #     userid = f.readline().strip()
+            #
+            # self.exchanges[exchange]["Client"].apiKey = key
+            # self.exchanges[exchange]["Client"].secret = secret
+            #
+            # if exchange == "Bitstamp":
+            #     self.exchanges[exchange]["Client"].uid = userid
 
             self.exchanges[exchange]["Client"].load_markets()
 

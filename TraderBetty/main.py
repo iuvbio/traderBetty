@@ -3,12 +3,18 @@
 Main executable
 """
 
-import time
+import os
 import sys
-from .betty import Trader as Tb
+import time
+import json
+from TraderBetty.TraderBetty.betty import Trader as Tb
 
+here = os.path.abspath("TraderBetty/TraderBetty")
+root = os.path.dirname(here)
+config = os.path.join(root, "config.ini")
+keys_file = os.path.join(os.path.dirname(root), "APIs/keys.json")
 
-betty = Tb(input("API Path: "), input("Wallet file: "))
+betty = Tb(config_path=config, api_path=keys_file)
 
 
 def main(sleeptime=10):
@@ -20,6 +26,6 @@ def main(sleeptime=10):
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     status = main()
     sys.exit(status)
