@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import time
 import json
 import ccxt
 from itertools import combinations
@@ -51,11 +52,10 @@ class PortfolioManager():
         self._update_symbols()
 
         if os.path.isfile("%s/coindf.csv" % self.DATA_PATH):
-            self.coindf = self.load_coindf()
+            first_run = False
 
-        else:
-            self._make_coindf()
-            self._match_symbols()
+        self._make_coindf()
+        self._match_symbols()
 
         self._update_balances()
         self._update_eur_balance()
@@ -201,20 +201,29 @@ class PortfolioManager():
 
     def get_ticker(self, exchange, symbol, last=True):
         client = self.exchanges[exchange]["Client"]
-        if last:
-            tick = client.fetch_ticker(symbol)["last"]
-        else:
-            tick = client.fetch_ticker(symbol)
+        if client.has["fetchTicker"]:
+            delay = int(client.rateLimit / 1000)
+            time.sleep(delay)
+            if last:
+                tick = client.fetch_ticker(symbol)["last"]
+            else:
+                tick = client.fetch_ticker(symbol)
 
-        return tick
+            return tick
+        else:
+            print("%s doesn't support fetch_ticker()" % exchange)
 
     def get_order_book(self, exchange, symbol):
         client = self.exchanges[exchange]["Client"]
-        print(client.fetch_order_book(symbol))
+        if client.has["fetchOrderBook"]:
+            delay = int(client.rateLimit / 1000)
+            time.sleep(delay)
+            return client.fetch_order_book(symbol)
+        else:
+            print("%s doesn't support fetch_order_book()")
 
     def get_best_order(self, exchange, symbol, verbose=False):
-        client = self.exchanges[exchange]["Client"]
-        orderbook = client.fetch_order_book(symbol)
+        orderbook = self.get_order_book(exchange, symbol)
         bid = orderbook['bids'][0][0] if len(orderbook['bids']) > 0 else None
         ask = orderbook['asks'][0][0] if len(orderbook['asks']) > 0 else None
         spread = (ask - bid) if (bid and ask) else None
