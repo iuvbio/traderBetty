@@ -10,7 +10,7 @@ from configparser import ConfigParser
 from forex_python.converter import CurrencyRates
 
 
-class Trader():
+class PortfolioManager():
     def __init__(self, config_path, api_path, wallets=None):
         """
 
@@ -49,8 +49,14 @@ class Trader():
         self._initiate_markets()
         self._update_currencies()
         self._update_symbols()
-        self._make_coindf()
-        self._match_symbols()
+
+        if os.path.isfile("%s/coindf.csv" % self.DATA_PATH):
+            self.coindf = self.load_coindf()
+
+        else:
+            self._make_coindf()
+            self._match_symbols()
+
         self._update_balances()
         self._update_eur_balance()
         self._update_fees()
@@ -337,6 +343,11 @@ class Trader():
     def store_coindf(self):
         self.coindf.to_csv("%s/coindf.csv" % self.DATA_PATH, sep=";")
 
+    def load_coindf(self):
+        df = pd.read_csv("%s/coindf.csv" % self.DATA_PATH, sep=";")
+
+        return df
+
     def calc_spread(self, price1, price2):
         prices = [price1, price2]
         max_p = max(prices)
@@ -363,6 +374,8 @@ class Trader():
             total = self.coindf["Total_EUR_Balance"].sum()
             return total
 
+
+class Trader(PortfolioManager):
     def get_arb_data(self, base, quote1="EUR", quote2="USD"):
         if quote1 == "EUR" and quote2 == "USD":
             convrate = self.c.get_rate("USD", "EUR")
@@ -398,7 +411,7 @@ class Trader():
                           "Profit: %.5f\n" %
                           (exchange, asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
 
-    def btwn_ex_arb(self, base, quote, volume=1):
+    def btwn_ex_arb(self, base, quote, volume=1, report=False):
         bidask = self.get_all_ex_bid_ask(base, quote)
         exchanges = list(bidask.keys())
         ex_pairs = [comb for comb in combinations(exchanges, 2)]
@@ -406,32 +419,44 @@ class Trader():
             asks = sorted([(pair[0], bidask[pair[0]]["ask"]), (pair[1], bidask[pair[1]]["ask"])], key=lambda x: x[1])
             bids = sorted([(pair[0], bidask[pair[0]]["bid"]), (pair[1], bidask[pair[1]]["bid"])], key=lambda x: x[1],
                           reverse=True)
-            if asks[0][1] == asks[1][1]:
-                print("Asks are equal")
-            if bids[0][1] == bids[1][1]:
-                print("Bids are euqal")
 
-            if asks[0][0] != bids[0][0]:
+            if asks[0][0] == bids[0][0]:
+                if report:
+                    print("No arbitrage possible between %s and %s." % (pair[0], pair[1]))
+
+            else:
+                if report:
+                    if asks[0][1] == asks[1][1]:
+                        print("Asks are equal")
+                    if bids[0][1] == bids[1][1]:
+                        print("Bids are euqal")
+
                 spread = bids[0][1] - asks[0][1]
                 spread_rate = spread / asks[0][1]
                 buyfee = self.get_trading_fee(asks[0][0], base, quote=quote)
                 sellfee = self.get_trading_fee(bids[0][0], base, quote=quote)
-                cost = volume * asks[0][1]
-                cost += cost * buyfee
                 wthdrwl = self.get_funding_fee(asks[0][0], base)[1]
                 dpst = self.get_funding_fee(bids[0][0], base)[0]
-                sellvol = volume - wthdrwl if wthdrwl else volume
+
+                minvol = max([dpst, wthdrwl]) * (1 + buyfee) * (1 + sellfee) if dpst and wthdrwl else wthdrwl if wthdrwl else dpst if dpst else 1
+                cost = minvol * asks[0][1]
+                cost += cost * buyfee
+                sellvol = minvol - wthdrwl if wthdrwl else minvol
                 sellvol = sellvol - dpst if dpst else sellvol
                 income = sellvol * bids[0][1]
                 income -= income * sellfee
                 profit = income - cost
 
-                print("%s/%s\n"
-                      "Possible arbitrage between %s and %s\n"
-                      "Buy on %s price: %.2f\n"
-                      "Sell on %s price: %.2f\n"
-                      "Spread: %.2f %.2f%%\n"
-                      "Profit: %.5f" %
-                      (base, quote, pair[0], pair[1], asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
-            else:
-                print("No arbitrage possible between %s and %s." % (pair[0], pair[1]))
+                if profit > 0:
+                    print("%s/%s\n"
+                          "Possible arbitrage between %s and %s\n"
+                          "Buy on %s for: %.2f\n"
+                          "Sell on %s for: %.2f\n"
+                          "Spread: %.2f (%.2f%%)\n"
+                          "Profit: %.5f at volume %.5f\n" %
+                          (base, quote, pair[0], pair[1], asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit, minvol))
+                else:
+                    if report:
+                        print("No profitable arbitrage trade possible for %s/%s between %s and %s." % (base, quote, pair[0], pair[1]))
+                    else:
+                        pass
