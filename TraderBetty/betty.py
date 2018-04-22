@@ -3,6 +3,7 @@
 import os
 import json
 import ccxt
+from itertools import combinations
 
 import pandas as pd
 from configparser import ConfigParser
@@ -12,10 +13,8 @@ from forex_python.converter import CurrencyRates
 class Trader():
     def __init__(self, config_path, api_path, wallets=None):
         """
-        The API path should be a directory containing a directory for each exchange which contains a key file
-        named after the exchange as well.
-        Wallets is a json file containing containing a dictionary with the wallet names as keys for another dictionary
-        with the currencies as keys and the corresponding balance as value.
+
+        :param config_path:
         :param api_path:
         :param wallets:
         """
@@ -58,7 +57,7 @@ class Trader():
 
     # method for creating the coindf, should only be run once
     def _make_coindf(self):
-        # TODO: asign columns Withdrawal_Fee, Deposit_Fee, Precision, Limit_Max, Limit_Min
+        # TODO: asign columns Precision, Limit_Max, Limit_Min
         exchanges = [ex for ex in self.exchanges.keys()]
         columns = ["Base_Symbols", "Quote_Symbols", "Withdrawal_Fee", "Deposit_Fee", "Precision",
                    "Limit_Max", "Limit_Min", "Balance", "EUR_Balance"]
@@ -402,7 +401,7 @@ class Trader():
     def btwn_ex_arb(self, base, quote, volume=1):
         bidask = self.get_all_ex_bid_ask(base, quote)
         exchanges = list(bidask.keys())
-        ex_pairs = [(exchanges[0], exchanges[1]), (exchanges[0], exchanges[2]), (exchanges[1], exchanges[2])]
+        ex_pairs = [comb for comb in combinations(exchanges, 2)]
         for pair in ex_pairs:
             asks = sorted([(pair[0], bidask[pair[0]]["ask"]), (pair[1], bidask[pair[1]]["ask"])], key=lambda x: x[1])
             bids = sorted([(pair[0], bidask[pair[0]]["bid"]), (pair[1], bidask[pair[1]]["bid"])], key=lambda x: x[1],
@@ -421,16 +420,18 @@ class Trader():
                 cost += cost * buyfee
                 wthdrwl = self.get_funding_fee(asks[0][0], base)[1]
                 dpst = self.get_funding_fee(bids[0][0], base)[0]
-                sellvol = volume - wthdrwl - dpst
+                sellvol = volume - wthdrwl if wthdrwl else volume
+                sellvol = sellvol - dpst if dpst else sellvol
                 income = sellvol * bids[0][1]
                 income -= income * sellfee
                 profit = income - cost
 
-                print("Possible arbitrage between %s and %s\n"
+                print("%s/%s\n"
+                      "Possible arbitrage between %s and %s\n"
                       "Buy on %s price: %.2f\n"
                       "Sell on %s price: %.2f\n"
                       "Spread: %.2f %.2f%%\n"
                       "Profit: %.5f" %
-                      (pair[0], pair[1], asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
+                      (base, quote, pair[0], pair[1], asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
             else:
                 print("No arbitrage possible between %s and %s." % (pair[0], pair[1]))
