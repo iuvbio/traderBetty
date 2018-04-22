@@ -8,8 +8,6 @@ import pandas as pd
 from configparser import ConfigParser
 from forex_python.converter import CurrencyRates
 
-IDX = pd.IndexSlice
-
 
 class Trader():
     def __init__(self, config_path, api_path, wallets=None):

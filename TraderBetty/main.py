@@ -16,7 +16,7 @@ keys_file = os.path.join(root, "keys.json")
 
 betty = Tb(config_path=config, api_path=keys_file)
 
-
+# TODO: include possibility to input api and config path
 def main(sleeptime=10):
     try:
         while True:
