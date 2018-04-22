@@ -42,6 +42,7 @@ class Trader():
 
         self.last_prices = {}
 
+        #TODO: implement wallet address tracking
         if wallets:
             with open(wallets, "r") as f:
                 self.wallets = json.load(f)
@@ -53,6 +54,7 @@ class Trader():
         self._match_symbols()
         self._update_balances()
         self._update_eur_balance()
+        self._update_fees()
 
     # method for creating the coindf, should only be run once
     def _make_coindf(self):
@@ -98,7 +100,6 @@ class Trader():
                 self.coindf[exchange, "Quote_Symbols"].loc[coin] = coinqsymbols
 
     def _update_balances(self):
-        # TODO: Solve the err_rate_limit error on Bitfinex
         for exchange in self.exchanges:
             balance = self.get_balance(exchange, hide_zero=False)
             for coin in self.coindf.index:
@@ -167,6 +168,13 @@ class Trader():
             total_balances.append(self.coindf.loc[coin][:, "EUR_Balance"].sum())
         self.coindf["Total_EUR_Balance"] = total_balances
 
+    def _update_fees(self):
+        for exchange in self.exchanges.keys():
+            for coin in self.coins:
+                deposit, withdrawal = self.get_funding_fee(exchange, coin)
+                self.coindf[exchange, "Withdrawal_Fee"].loc[coin] = withdrawal
+                self.coindf[exchange, "Deposit_Fee"].loc[coin] = deposit
+
     # methods that can be called for individual exchanges
     def get_balance(self, exchange, total=True, hide_zero=True, verbose=False):
         client = self.exchanges[exchange]["Client"]
@@ -211,7 +219,7 @@ class Trader():
 
         return {"bid": bid, "ask": ask}
 
-    def get_fee(self, exchange, coin, quote="BTC"):
+    def get_trading_fee(self, exchange, coin, quote="BTC"):
         symbol = coin + "/" + quote
         client = self.exchanges[exchange]["Client"]
         try:
@@ -222,6 +230,19 @@ class Trader():
             fee = None
 
         return fee
+
+    def get_funding_fee(self, exchange, coin):
+        client = self.exchanges[exchange]["Client"]
+        fees = client.fees["funding"]
+        try:
+            deposit = fees["deposit"][coin]
+            withdrawal = fees["withdraw"][coin]
+        except KeyError:
+            # print("%s not available on %s" % (coin, exchange))
+            deposit = None
+            withdrawal = None
+
+        return deposit, withdrawal
 
     # not exchange specific callable methods
     def get_all_ex_lp(self, base, quote, exchanges=None):
@@ -326,13 +347,13 @@ class Trader():
 
         return {"buy_price": min_p, "sell_price": max_p, "spread": spread, "spread_p": spread_rate}
 
-    def calc_profit(self, price_buy, price_sell, fee1, fee2, volume=1):
+    def calc_profit(self, price_buy, price_sell, buyfee, sellfee, volume=1):
         # Buy x BTC at price1 and apply trading fee
         cost = volume * price_buy
-        cost += cost * fee1
+        cost += cost * buyfee
         # Sell x BTC at price 2 and apply trading fee
         income = volume * price_sell
-        income -= income * fee2
+        income -= income * sellfee
         # Convert to base currency and apply conversion surcharge
         profit = income - cost
 
@@ -365,8 +386,8 @@ class Trader():
                               reverse=True)
                 spread = bids[0][1] - asks[0][1]
                 spread_rate = spread / asks[0][1]
-                buyfee = self.get_fee(exchange, base, quote=asks[0][0])
-                sellfee = self.get_fee(exchange, base, quote=bids[0][0])
+                buyfee = self.get_trading_fee(exchange, base, quote=asks[0][0])
+                sellfee = self.get_trading_fee(exchange, base, quote=bids[0][0])
                 profit = self.calc_profit(asks[0][1], bids[0][1], buyfee, sellfee)
 
                 # TODO: Get precision to print with currency and exchange specific decimals
@@ -378,3 +399,38 @@ class Trader():
                           "Profit: %.5f\n" %
                           (exchange, asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
 
+    def btwn_ex_arb(self, base, quote, volume=1):
+        bidask = self.get_all_ex_bid_ask(base, quote)
+        exchanges = list(bidask.keys())
+        ex_pairs = [(exchanges[0], exchanges[1]), (exchanges[0], exchanges[2]), (exchanges[1], exchanges[2])]
+        for pair in ex_pairs:
+            asks = sorted([(pair[0], bidask[pair[0]]["ask"]), (pair[1], bidask[pair[1]]["ask"])], key=lambda x: x[1])
+            bids = sorted([(pair[0], bidask[pair[0]]["bid"]), (pair[1], bidask[pair[1]]["bid"])], key=lambda x: x[1],
+                          reverse=True)
+            if asks[0][1] == asks[1][1]:
+                print("Asks are equal")
+            if bids[0][1] == bids[1][1]:
+                print("Bids are euqal")
+
+            if asks[0][0] != bids[0][0]:
+                spread = bids[0][1] - asks[0][1]
+                spread_rate = spread / asks[0][1]
+                buyfee = self.get_trading_fee(asks[0][0], base, quote=quote)
+                sellfee = self.get_trading_fee(bids[0][0], base, quote=quote)
+                cost = volume * asks[0][1]
+                cost += cost * buyfee
+                wthdrwl = self.get_funding_fee(asks[0][0], base)[1]
+                dpst = self.get_funding_fee(bids[0][0], base)[0]
+                sellvol = volume - wthdrwl - dpst
+                income = sellvol * bids[0][1]
+                income -= income * sellfee
+                profit = income - cost
+
+                print("Possible arbitrage between %s and %s\n"
+                      "Buy on %s price: %.2f\n"
+                      "Sell on %s price: %.2f\n"
+                      "Spread: %.2f %.2f%%\n"
+                      "Profit: %.5f" %
+                      (pair[0], pair[1], asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
+            else:
+                print("No arbitrage possible between %s and %s." % (pair[0], pair[1]))
