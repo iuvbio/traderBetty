@@ -233,6 +233,16 @@ class PortfolioManager():
 
         return {"bid": bid, "ask": ask}
 
+    def get_ohlcv(self, exchange, symbol, timeframe="1d"):
+        client = self.exchanges[exchange]["Client"]
+        if client.has["fetchOHLCV"]:
+            delay = int(client.rateLimit / 1000)
+            time.sleep(delay)
+            ohlcv = client.fetch_ohlcv(symbol, timeframe)
+            return ohlcv
+        else:
+            print("%s doesn't support fetch_ohlcv()" % exchange)
+
     def get_trading_fee(self, exchange, coin, quote="BTC"):
         symbol = coin + "/" + quote
         client = self.exchanges[exchange]["Client"]
