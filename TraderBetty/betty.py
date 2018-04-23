@@ -424,13 +424,13 @@ class Trader(PortfolioManager):
                 # TODO: Get precision to print with currency and exchange specific decimals
                 if asks[0][0] != bids[0][0]:
                     print("Possible arbitrage on %s\n"
-                          "Buy in %s price: %.2f\n"
-                          "Sell in %s price: %.2f\n"
+                          "Buy in %s price: %.5f\n"
+                          "Sell in %s price: %.5f\n"
                           "Spread: %.2f %.2f%%\n"
                           "Profit: %.5f\n" %
                           (exchange, asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
 
-    def btwn_ex_arb(self, base, quote, volume=1, report=False):
+    def btwn_ex_arb(self, base, quote, volume=None, report=False):
         bidask = self.get_all_ex_bid_ask(base, quote)
         exchanges = list(bidask.keys())
         ex_pairs = [comb for comb in combinations(exchanges, 2)]
@@ -457,10 +457,15 @@ class Trader(PortfolioManager):
                 wthdrwl = self.get_funding_fee(asks[0][0], base)[1]
                 dpst = self.get_funding_fee(bids[0][0], base)[0]
 
-                minvol = max([dpst, wthdrwl]) * (1 + buyfee) * (1 + sellfee) if dpst and wthdrwl else wthdrwl if wthdrwl else dpst if dpst else 1
-                cost = minvol * asks[0][1]
+                minvol = max([dpst, wthdrwl]) if dpst and wthdrwl else wthdrwl if wthdrwl else dpst if dpst else 0
+                minvol = minvol * (1 + buyfee) * (1 + sellfee)
+
+                if not volume or volume < volume:
+                    volume = minvol
+
+                cost = volume * asks[0][1]
                 cost += cost * buyfee
-                sellvol = minvol - wthdrwl if wthdrwl else minvol
+                sellvol = volume - wthdrwl if wthdrwl else volume
                 sellvol = sellvol - dpst if dpst else sellvol
                 income = sellvol * bids[0][1]
                 income -= income * sellfee
@@ -469,11 +474,11 @@ class Trader(PortfolioManager):
                 if profit > 0:
                     print("%s/%s\n"
                           "Possible arbitrage between %s and %s\n"
-                          "Buy on %s for: %.2f\n"
-                          "Sell on %s for: %.2f\n"
+                          "Buy on %s for: %.5f\n"
+                          "Sell on %s for: %.5f\n"
                           "Spread: %.2f (%.2f%%)\n"
                           "Profit: %.5f at volume %.5f\n" %
-                          (base, quote, pair[0], pair[1], asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit, minvol))
+                          (base, quote, pair[0], pair[1], asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit, volume))
                 else:
                     if report:
                         print("No profitable arbitrage trade possible for %s/%s between %s and %s." % (base, quote, pair[0], pair[1]))
