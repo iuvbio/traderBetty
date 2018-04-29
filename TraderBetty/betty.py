@@ -69,8 +69,6 @@ class PortfolioManager():
                    "Limit_Max", "Limit_Min", "Balance", "EUR_Balance"]
         index = pd.MultiIndex.from_product([exchanges, columns], names=["Exchanges", "Columns"])
         df = pd.DataFrame(None, index=self.coins, columns=index)
-        for exchange in self.exchanges:
-            df[exchange]["Balance"] = pd.to_numeric(df[exchange]["Balance"], errors="coerce")
 
         self.coindf = df
 
@@ -112,7 +110,7 @@ class PortfolioManager():
                     coinbal = balance[coin]
                 except KeyError:
                     coinbal = 0
-                self.coindf[exchange, "Balance"].loc[coin] = coinbal
+                self.coindf.loc[coin, (exchange, "Balance")] = coinbal
 
         total_balances = []
         for coin in self.coindf.index:
@@ -143,7 +141,7 @@ class PortfolioManager():
                             bestprice = 0
 
                 for exchange in self.exchanges:
-                    coinbal = self.coindf[exchange, "Balance"].loc[coin]
+                    coinbal = self.coindf.loc[coin, (exchange, "Balance")]
                     if coinbal > 0:
                         price = bestprice
                         if eurprices:
@@ -166,7 +164,7 @@ class PortfolioManager():
                     else:
                         convbal = 0
 
-                    self.coindf[exchange, "EUR_Balance"].loc[coin] = convbal
+                    self.coindf.loc[coin, (exchange, "EUR_Balance")] = convbal
 
         total_balances = []
         for coin in self.coindf.index:
@@ -388,14 +386,17 @@ class PortfolioManager():
 
         return profit
 
-    def get_portfolio_value(self, quote="EUR"):
+    def get_portfolio_value(self, quote="EUR", update=False):
+        if update:
+            self._update_balances()
+            self._update_eur_balance()
         if quote == "EUR":
             total = self.coindf["Total_EUR_Balance"].sum()
             return total
 
 
 class Trader(PortfolioManager):
-    def get_arb_data(self, base, quote1="EUR", quote2="USD"):
+    def get_arb_data(self, base, quote1="EUR", quote2="USD", report=False):
         if quote1 == "EUR" and quote2 == "USD":
             convrate = self.c.get_rate("USD", "EUR")
         else:
@@ -404,6 +405,7 @@ class Trader(PortfolioManager):
         bidask1 = self.get_all_ex_bid_ask(base, quote1)
         bidask2 = self.get_all_ex_bid_ask(base, quote2)
 
+        arb_dict = {}
         convdict = {}
         for exchange in bidask1.keys():
             if exchange in bidask2.keys():
@@ -421,19 +423,35 @@ class Trader(PortfolioManager):
                 sellfee = self.get_trading_fee(exchange, base, quote=bids[0][0])
                 profit = self.calc_profit(asks[0][1], bids[0][1], buyfee, sellfee)
 
-                # TODO: Get precision to print with currency and exchange specific decimals
-                if asks[0][0] != bids[0][0]:
-                    print("Possible arbitrage on %s\n"
-                          "Buy in %s price: %.5f\n"
-                          "Sell in %s price: %.5f\n"
-                          "Spread: %.2f %.2f%%\n"
-                          "Profit: %.5f\n" %
-                          (exchange, asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
+                if profit > 0:
+                    arb_dict[exchange] = {
+                        "base": base,
+                        "buy_curr": asks[0][0],
+                        "sell_curr": bids[0][0],
+                        "buy_price": asks[0][1],
+                        "sell_price": bids[0][1],
+                        "spread": spread,
+                        "profit": profit
+                    }
+
+                if report:
+                    # TODO: Get precision to print with currency and exchange specific decimals
+                    if asks[0][0] != bids[0][0]:
+                        print("%s"
+                              "Possible arbitrage on %s\n"
+                              "Buy in %s price: %.5f\n"
+                              "Sell in %s price: %.5f\n"
+                              "Spread: %.2f %.2f%%\n"
+                              "Profit: %.5f\n" %
+                              (base, exchange, asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit))
+
+        return arb_dict
 
     def btwn_ex_arb(self, base, quote, volume=None, report=False):
         bidask = self.get_all_ex_bid_ask(base, quote)
         exchanges = list(bidask.keys())
         ex_pairs = [comb for comb in combinations(exchanges, 2)]
+        arb_dict = {}
         for pair in ex_pairs:
             asks = sorted([(pair[0], bidask[pair[0]]["ask"]), (pair[1], bidask[pair[1]]["ask"])], key=lambda x: x[1])
             bids = sorted([(pair[0], bidask[pair[0]]["bid"]), (pair[1], bidask[pair[1]]["bid"])], key=lambda x: x[1],
@@ -460,7 +478,7 @@ class Trader(PortfolioManager):
                 minvol = max([dpst, wthdrwl]) if dpst and wthdrwl else wthdrwl if wthdrwl else dpst if dpst else 0
                 minvol = minvol * (1 + buyfee) * (1 + sellfee)
 
-                if not volume or volume < volume:
+                if not volume or volume < minvol:
                     volume = minvol
 
                 cost = volume * asks[0][1]
@@ -472,15 +490,79 @@ class Trader(PortfolioManager):
                 profit = income - cost
 
                 if profit > 0:
-                    print("%s/%s\n"
-                          "Possible arbitrage between %s and %s\n"
-                          "Buy on %s for: %.5f\n"
-                          "Sell on %s for: %.5f\n"
-                          "Spread: %.2f (%.2f%%)\n"
-                          "Profit: %.5f at volume %.5f\n" %
-                          (base, quote, pair[0], pair[1], asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit, volume))
-                else:
-                    if report:
-                        print("No profitable arbitrage trade possible for %s/%s between %s and %s." % (base, quote, pair[0], pair[1]))
+                    arb_dict[pair] = {
+                        "buyex": asks[0][0],
+                        "sellex": bids[0][0],
+                        "buyprice": asks[0][1],
+                        "sellprice": bids[0][1],
+                        "spread": spread
+                        # "totalfees": wthdrwl + dpst + buyfee * volume + sellfee * income
+                    }
+
+                if report:
+                    if profit > 0:
+                        print("%s/%s\n"
+                              "Possible arbitrage between %s and %s\n"
+                              "Buy on %s for: %.5f\n"
+                              "Sell on %s for: %.5f\n"
+                              "Spread: %.2f (%.2f%%)\n"
+                              "Profit: %.5f at volume %.5f\n" %
+                              (base, quote, pair[0], pair[1], asks[0][0], asks[0][1], bids[0][0], bids[0][1], spread, spread_rate, profit, volume))
                     else:
-                        pass
+                        print("No profitable arbitrage trade possible for %s/%s between %s and %s." % (base, quote, pair[0], pair[1]))
+
+        return arb_dict
+
+    def on_ex_arb_trade(self, base):
+        arb_dict = self.get_arb_data(base)
+        if arb_dict:
+            for exchange in arb_dict.keys():
+                client = self.exchanges[exchange]["Client"]
+                buy_quote = arb_dict[exchange]["buy_curr"]
+                buy_price = arb_dict[exchange]["buy_price"]
+                sell_quote = arb_dict[exchange]["sell_curr"]
+                sell_price = arb_dict[exchange]["sell_price"]
+                available_balance = client.fetch_balance()[base]["free"]
+                amount = 0.75 * available_balance
+                if available_balance:
+                    order_id = self.limit_buy_order(exchange, base, buy_quote, amount, buy_price)
+                    order_status = "open"
+                    while order_status == "open":
+                        order_status = self.get_order_status(exchange, order_id)
+                        delay = int(client.rateLimit / 1000)
+                        time.sleep(delay)
+                    if order_status == "closed":
+                        order_id = self.limit_sell_order(exchange, base, sell_quote, amount, sell_price)
+                        return order_id
+                else:
+                    print("Not enough funds")
+
+    def limit_buy_order(self, exchange, base, quote, amount, price):
+        client = self.exchanges[exchange]["Client"]
+        symbol = base + "/" + quote
+        ex_base_symbols = self.coindf.loc[base, (exchange, "Base_Symbols")]
+        if symbol in ex_base_symbols:
+            order = client.create_limit_buy_order(symbol, amount, price)
+            order_id = order["id"]
+            return order_id
+        else:
+            print("Symbol not available on %s" % exchange)
+
+    def limit_sell_order(self, exchange, base, quote, amount, price):
+        client = self.exchanges[exchange]["Client"]
+        symbol = base + "/" + quote
+        ex_base_symbols = self.coindf.loc[base, (exchange, "Base_Symbols")]
+        if symbol in ex_base_symbols:
+            order = client.create_limit_sell_order(symbol, amount, price)
+            order_id = order["id"]
+            return order_id
+        else:
+            print("Symbol not available on %s" % exchange)
+
+    def get_order_status(self, exchange, order_id):
+        client = self.exchanges[exchange]["Client"]
+        if client.has["fetchOrder"]:
+            order = client.fetch_order(order_id)
+            return order["status"]
+        else:
+            print("%s doesn't support fetch_order()")
