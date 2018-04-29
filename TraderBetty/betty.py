@@ -514,6 +514,7 @@ class Trader(PortfolioManager):
         return arb_dict
 
     def on_ex_arb_trade(self, base):
+        # TODO: Make sure sold is available and the same as amount bought
         arb_dict = self.get_arb_data(base)
         if arb_dict:
             for exchange in arb_dict.keys():
@@ -522,7 +523,7 @@ class Trader(PortfolioManager):
                 buy_price = arb_dict[exchange]["buy_price"]
                 sell_quote = arb_dict[exchange]["sell_curr"]
                 sell_price = arb_dict[exchange]["sell_price"]
-                available_balance = client.fetch_balance()[base]["free"]
+                available_balance = client.fetch_balance()[buy_quote]["free"]
                 amount = 0.75 * available_balance
                 if available_balance:
                     order_id = self.limit_buy_order(exchange, base, buy_quote, amount, buy_price)
@@ -566,3 +567,12 @@ class Trader(PortfolioManager):
             return order["status"]
         else:
             print("%s doesn't support fetch_order()")
+
+    def query_order(self, exchange, order_id):
+        client = self.exchanges[exchange]["Client"]
+        if client.has["fetchOrder"]:
+            order = client.fetch_order(order_id)
+        else:
+            order = None
+
+        return order

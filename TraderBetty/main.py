@@ -20,7 +20,7 @@ trader = betty.Trader(config_path=config, api_path=keys_file)
 def main(sleeptime=10):
     try:
         while True:
-            trader.get_arb_data("BTC")
+            trader.on_ex_arb_trade("BTC")
             time.sleep(sleeptime)
     except KeyboardInterrupt:
         pass
