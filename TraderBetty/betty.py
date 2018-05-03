@@ -42,7 +42,6 @@ class PortfolioManager():
 
         self.last_prices = {}
 
-        #TODO: implement wallet address tracking
         if wallets:
             with open(wallets, "r") as f:
                 self.wallets = json.load(f)
@@ -63,7 +62,6 @@ class PortfolioManager():
 
     # method for creating the coindf, should only be run once
     def _make_coindf(self):
-        # TODO: asign columns Precision, Limit_Max, Limit_Min
         exchanges = [ex for ex in self.exchanges.keys()]
         columns = ["Base_Symbols", "Quote_Symbols", "Withdrawal_Fee", "Deposit_Fee", "Precision",
                    "Limit_Max", "Limit_Min", "Balance", "EUR_Balance"]
@@ -321,7 +319,6 @@ class PortfolioManager():
         return (bestex, bestbid)
 
     def convert_to_eur(self, base, volume=1):
-        # TODO: fully implement logic to get EUR price (USDT and exchange's own coin)
         eurprices = self.get_all_ex_lp(base, "EUR")
         if eurprices:
             ex = eurprices[0][0]
@@ -435,7 +432,6 @@ class Trader(PortfolioManager):
                     }
 
                 if report:
-                    # TODO: Get precision to print with currency and exchange specific decimals
                     if asks[0][0] != bids[0][0]:
                         print("%s"
                               "Possible arbitrage on %s\n"
@@ -514,7 +510,6 @@ class Trader(PortfolioManager):
         return arb_dict
 
     def on_ex_arb_trade(self, base):
-        # TODO: Make sure sold is available and the same as amount bought
         arb_dict = self.get_arb_data(base)
         if arb_dict:
             for exchange in arb_dict.keys():
