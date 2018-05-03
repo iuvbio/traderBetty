@@ -10,9 +10,11 @@ import pandas as pd
 from configparser import ConfigParser
 from forex_python.converter import CurrencyRates
 
+from . import wallets
+
 
 class PortfolioManager():
-    def __init__(self, config_path, api_path, wallets=None):
+    def __init__(self, config_path, api_path):
         """
 
         :param config_path:
@@ -42,10 +44,10 @@ class PortfolioManager():
 
         self.last_prices = {}
 
-        #TODO: implement wallet address tracking
-        if wallets:
-            with open(wallets, "r") as f:
-                self.wallets = json.load(f)
+        #TODO: implement wallet address tracking for other coins
+        if "iota" in list(config.keys()):
+            self.iota_wallet = wallets.IotaWallet(config_path)
+            self.iota_bal = self.iota_wallet.check_balance()
 
         self._initiate_markets()
         self._update_currencies()
