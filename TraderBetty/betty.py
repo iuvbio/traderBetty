@@ -3,11 +3,13 @@
 import os
 import time
 import json
-import ccxt
 from itertools import combinations
 
 import pandas as pd
 from configparser import ConfigParser
+
+import ccxt
+from ccxt import errors
 from forex_python.converter import CurrencyRates
 
 from . import wallets
@@ -19,7 +21,6 @@ class PortfolioManager():
 
         :param config_path:
         :param api_path:
-        :param wallets:
         """
         config = ConfigParser()
         config.read(config_path)
@@ -43,11 +44,13 @@ class PortfolioManager():
             self.exchanges[id]["Client"] = exchange(exchange_config)
 
         self.last_prices = {}
+        self.wallets = {}
 
-        #TODO: implement wallet address tracking for other coins
-        if "iota" in list(config.keys()):
-            self.iota_wallet = wallets.IotaWallet(config_path)
-            self.iota_bal = self.iota_wallet.check_balance()
+        # TODO: implement wallet address tracking for other coins
+        if config.get("main", "wallets"):
+            if "iota" in list(config.keys()):
+                self.iota_wallet = wallets.IotaWallet(config_path)
+                self.wallets["IOTA"] = self.iota_wallet.check_balance()
 
         self._initiate_markets()
         self._update_currencies()
@@ -62,10 +65,23 @@ class PortfolioManager():
         self._update_balances()
         self._update_eur_balance()
         self._update_fees()
+        self._update_precisions()
+        self._update_limits()
+
+    def _update_wallets(self):
+        bals = []
+        for coin in self.coindf.index:
+            try:
+                bal = sum(list(self.wallets[coin].values()))
+            except KeyError:
+                bal = 0
+            bals.append(bal)
+
+        self.coindf["Wallets"] = bals
 
     # method for creating the coindf, should only be run once
     def _make_coindf(self):
-        # TODO: asign columns Precision, Limit_Max, Limit_Min
+        # TODO: asign columns Limit_Max, Limit_Min
         exchanges = [ex for ex in self.exchanges.keys()]
         columns = ["Base_Symbols", "Quote_Symbols", "Withdrawal_Fee", "Deposit_Fee", "Precision",
                    "Limit_Max", "Limit_Min", "Balance", "EUR_Balance"]
@@ -180,6 +196,21 @@ class PortfolioManager():
                 self.coindf[exchange, "Withdrawal_Fee"].loc[coin] = withdrawal
                 self.coindf[exchange, "Deposit_Fee"].loc[coin] = deposit
 
+    def _update_precisions(self):
+        for exchange in self.exchanges.keys():
+            for coin in self.coins:
+                precision = self.get_precision(exchange, coin)
+                self.coindf[exchange, "Precision"].loc[coin] = precision
+
+    def _update_limits(self):
+        for exchange in self.exchanges.keys():
+            for coin in self.coins:
+                limits = self.get_limits(exchange, coin)
+                limit_max = limits["max"] if limits else None
+                limit_min = limits["min"] if limits else None
+                self.coindf[exchange, "Limit_Max"].loc[coin] = limit_max
+                self.coindf[exchange, "Limit_Min"].loc[coin] = limit_min
+
     # methods that can be called for individual exchanges
     def get_balance(self, exchange, total=True, hide_zero=True, verbose=False):
         client = self.exchanges[exchange]["Client"]
@@ -267,6 +298,35 @@ class PortfolioManager():
             withdrawal = None
 
         return deposit, withdrawal
+
+    def get_precision(self, exchange, coin):
+        client =self.exchanges[exchange]["Client"]
+        try:
+            precision = client.currency(coin)["precision"]
+        except errors.ExchangeError:
+            # print("No currency info for %s available on %s." % (coin, exchange))
+            precision = None
+        except KeyError:
+            # print("No precicions info for %s available on %s." % (coin, exchange))
+            precision = None
+
+        return precision
+
+    def get_limits(self, exchange, coin, type="amount"):
+        client = self.exchanges[exchange]["Client"]
+        try:
+            limits = client.currency(coin)["limits"]
+        except errors.ExchangeError:
+            # print("No currency info for %s available on %s." % (coin, exchange))
+            limits = None
+        except KeyError:
+            # print("No limits info for %s available on %s." % (coin, exchange))
+            limits = None
+
+        if limits:
+            limits = limits[type]
+
+        return limits
 
     # not exchange specific callable methods
     def get_all_ex_lp(self, base, quote, exchanges=None):
