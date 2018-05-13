@@ -90,6 +90,14 @@ class PortfolioManager():
 
         self.coindf = df
 
+    def _loop_exchanges(self, func):
+        for exchange in self.exchanges:
+            self._loop_coins(exchange, func)
+
+    def _loop_coins(self, exchange, func):
+        for coin in self.coins:
+            func(exchange, coin)
+
     # methods that get called at initiation, not exchange specific
     def _initiate_markets(self):
         for exchange in self.exchanges:
