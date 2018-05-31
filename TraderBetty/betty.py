@@ -15,7 +15,7 @@ from forex_python.converter import CurrencyRates
 from . import wallets
 
 
-class PortfolioManager():
+class PortfolioManager:
     def __init__(self, config_path, api_path):
         """
 
@@ -73,6 +73,8 @@ class PortfolioManager():
         for coin in self.coindf.index:
             try:
                 bal = sum(list(self.wallets[coin].values()))
+                if coin == "IOTA":
+                    bal = bal / 1000000  # convert iota to Miota
             except KeyError:
                 bal = 0
             bals.append(bal)
