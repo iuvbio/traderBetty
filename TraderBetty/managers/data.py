@@ -46,3 +46,6 @@ class DataManager(DataHandler):
         base, quote = symbol.split("/")
         pricedf.loc[base, quote] = price
         self.store_csv(pricedf, expr_path)
+
+    def update_order_book(self, exchange, symbol, order_book):
+        path = "{:s}/order_book_{:s}_{:s}".format(self.ORDERBOOK_PATH, exchange, symbol)

@@ -71,6 +71,7 @@ class DataHandler(Handler):
         self.DATA_PATH = "data"
         self.BALANCE_PATH = self.DATA_PATH + "/balances.csv"
         self.TRADES_PATH = self.DATA_PATH + "/trades.csv"
+        self.ORDERBOOK_PATH = self.DATA_PATH + "/order_books"
         self.coins = self.config_loader.coins
         self.exchanges = self.config_loader.exchanges
         self.wallets = self.config_loader.wallets
@@ -105,6 +106,12 @@ class DataHandler(Handler):
                          exchange in self.exchanges}
         self.exprices = {exchange: self._load_ex_prices(exchange) for
                          exchange in self.exchanges}
+
+        allOrderBooks = [f for f in os.listdir(self.ORDERBOOK_PATH) if
+                         os.path.isfile(self.ORDERBOOK_PATH + "/" + f)]
+        self.order_books = {ex: {} for ex in self.exchanges}
+        for ex in self.order_books:
+            ex_books = [f for f in allOrderBooks if ex in f]
 
     def _load_balances(self):
         try:

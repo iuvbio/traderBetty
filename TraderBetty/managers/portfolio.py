@@ -162,6 +162,13 @@ class PortfolioManager(DataManager):
             return None
         return ex.fetch_order_book(symbol)
 
+    def get_ohlcv(self, exchange, symbol, freq="1d"):
+        ex = self.exchanges[exchange]
+        if not ex.has["fetchOHLCV"]:
+            print("{:s} doesn't support fetch_ohlcv().".format(ex))
+            return None
+        return ex.fetch_ohlcv(symbol, freq)
+
     # -------------------------------------------------------------------------
     # Price calculation methods
     # -------------------------------------------------------------------------
