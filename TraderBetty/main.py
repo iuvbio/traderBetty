@@ -6,7 +6,9 @@ Main executable
 import os
 import sys
 import time
-from . import betty
+
+from TraderBetty import betty
+
 
 here = os.path.abspath("TraderBetty/TraderBetty")
 root = os.path.dirname(here)

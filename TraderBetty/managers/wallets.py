@@ -1,3 +1,4 @@
+"""Iota wallet classes"""
 #!/usr/bin/env python3
 
 import os
@@ -13,7 +14,7 @@ class IotaWallet(object):
             raise ValueError
 
         self.config.read(config_path)
-        self.config_addresses = self.config.get('iota', 'addresses').split(',')
+        self.config_addresses = self.config.get('iota_wallet', 'addresses').split(',')
 
     def check_balance(self):
         iota_dict = {}
@@ -32,7 +33,7 @@ class IotaWallet(object):
         if len(addresses) == 0:
             print('No valid addresses found, exiting.')
         else:
-            config_uri = self.config.get('iota', 'uri')
+            config_uri = self.config.get('iota_wallet', 'uri')
             api = Iota(config_uri)
             response = None
 
@@ -47,6 +48,6 @@ class IotaWallet(object):
                 print(e)
 
             if response:
-                iota_dict = {address: response['balances'][i] for i, address in enumerate(addresses)}
+                iota_dict = {"IOTA": {address: response['balances'][i] for i, address in enumerate(addresses)}}
 
         return iota_dict

@@ -4,15 +4,15 @@ import os
 import time
 import json
 from itertools import combinations
+from configparser import ConfigParser
 
 import pandas as pd
-from configparser import ConfigParser
 
 import ccxt
 from ccxt import errors
 from forex_python.converter import CurrencyRates
 
-from . import wallets
+from TraderBetty.managers import wallets
 
 
 class PortfolioManager:
@@ -25,7 +25,9 @@ class PortfolioManager:
         config = ConfigParser()
         config.read(config_path)
         self.coins = config.get("main", "coins").split(",")
-        self.exchanges = {ex: {} for ex in config.get("main", "exchanges").split(",")}
+        self.exchanges = {
+            ex: {} for ex in config.get("main", "apps").split(",")
+            }
         self.c = CurrencyRates()
         self.DATA_PATH = "data"
         self.API_PATH = api_path
@@ -85,9 +87,11 @@ class PortfolioManager:
     def _make_coindf(self):
         # TODO: asign columns Limit_Max, Limit_Min
         exchanges = [ex for ex in self.exchanges.keys()]
-        columns = ["Base_Symbols", "Quote_Symbols", "Withdrawal_Fee", "Deposit_Fee", "Precision",
-                   "Limit_Max", "Limit_Min", "Balance", "EUR_Balance"]
-        index = pd.MultiIndex.from_product([exchanges, columns], names=["Exchanges", "Columns"])
+        columns = ["Base_Symbols", "Quote_Symbols", "Withdrawal_Fee",
+                    "Deposit_Fee", "Precision", "Limit_Max", "Limit_Min",
+                    "Balance", "EUR_Balance"]
+        index = pd.MultiIndex.from_product([exchanges, columns],
+                                            names=["Exchanges", "Columns"])
         df = pd.DataFrame(None, index=self.coins, columns=index)
 
         self.coindf = df
@@ -221,7 +225,7 @@ class PortfolioManager:
                 self.coindf[exchange, "Limit_Max"].loc[coin] = limit_max
                 self.coindf[exchange, "Limit_Min"].loc[coin] = limit_min
 
-    # methods that can be called for individual exchanges
+    # methods that can be called for individual apps
     def get_balance(self, exchange, total=True, hide_zero=True, verbose=False):
         client = self.exchanges[exchange]["Client"]
 
@@ -310,7 +314,7 @@ class PortfolioManager:
         return deposit, withdrawal
 
     def get_precision(self, exchange, coin):
-        client =self.exchanges[exchange]["Client"]
+        client = self.exchanges[exchange]["Client"]
         try:
             precision = client.currency(coin)["precision"]
         except errors.ExchangeError:
@@ -337,6 +341,15 @@ class PortfolioManager:
             limits = limits[type]
 
         return limits
+
+    def get_trades(self, exchange):
+        # TODO: Finish method
+        client = self.exchanges[exchange]["Client"]
+        if client.has["fetchMyTrades"]:
+            trades = client.fetch_my_trades()
+            return trades
+        else:
+            print("Exchange %s does not support method fetch_my_trades()" % exchange)
 
     # not exchange specific callable methods
     def get_all_ex_lp(self, base, quote, exchanges=None):
@@ -429,11 +442,12 @@ class PortfolioManager:
 
         return {"Exchange": ex, "Amount": amt, "Currency": curr}
 
+    # Data management methods
     def store_coindf(self):
         self.coindf.to_csv("%s/coindf.csv" % self.DATA_PATH, sep=";")
 
     def load_coindf(self):
-        df = pd.read_csv("%s/coindf.csv" % self.DATA_PATH, sep=";")
+        df = pd.read_csv("%s/coindf.csv" % self.DATA_PATH, sep=";", index_col=0, header=[0, 1])
 
         return df
 
