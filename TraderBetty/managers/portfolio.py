@@ -82,7 +82,7 @@ class PortfolioManager(DataManager):
         tradesdf["date"] = tradesdf["datetime"].apply(lambda d: d.date())
         self.updates[ex.id]["trades"] = dt.datetime.today()
         self.update_trades(exchange, tradesdf)
-        return tradesdf
+        return trades
 
     def get_all_trades(self):
         # This whole method is probably unnecessary
@@ -168,7 +168,17 @@ class PortfolioManager(DataManager):
             ob["timestamp"] = calendar.timegm(dt.datetime.now().timetuple())
         obdf = pd.DataFrame(ob)
         self.update_order_book(exchange, symbol, obdf)
-        return obdf
+        return ob
+
+    def get_best_order(self, exchange, symbol, verbose=False):
+        orderbook = self.get_order_book(exchange, symbol)
+        bid = orderbook['bids'][0][0] if len(orderbook['bids']) > 0 else None
+        ask = orderbook['asks'][0][0] if len(orderbook['asks']) > 0 else None
+        spread = (ask - bid) if (bid and ask) else None
+        if verbose:
+            print(exchange, 'market price',
+                  {'bid': bid, 'ask': ask, 'spread': "{:.2f}%".format(spread)})
+        return {"bid": bid, "ask": ask}
 
     def get_ohlcv(self, exchange, symbol, freq="1d", since=None):
         ex = self.exchanges[exchange]
@@ -182,7 +192,7 @@ class PortfolioManager(DataManager):
         ohlcvdf["datetime"] = ohlcvdf["timestamp"].apply(
             lambda d: dt.datetime.fromtimestamp(int(d / 1000)))
         self.update_ohlcv(exchange, symbol, freq, ohlcvdf)
-        return ohlcvdf
+        return ohlcv
 
     # -------------------------------------------------------------------------
     # Price calculation methods
