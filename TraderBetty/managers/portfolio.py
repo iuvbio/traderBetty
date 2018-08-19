@@ -180,6 +180,31 @@ class PortfolioManager(DataManager):
                   {'bid': bid, 'ask': ask, 'spread': "{:.2f}%".format(spread)})
         return {"bid": bid, "ask": ask}
 
+    def get_all_ex_bid_ask(self, symbol, exchanges=None):
+        if not exchanges:
+            exchanges = self.exchanges.keys()
+        orders = {}
+        for exchange in exchanges:
+            ex = self.exchanges[exchange]
+            orders[exchange] = self.get_best_order(ex.id, symbol) if symbol in ex.symbols else None
+        return orders
+
+    def get_best_ask(self, symbol, exchanges=None):
+        orders = self.get_all_ex_bid_ask(symbol, exchanges=exchanges)
+        orders = sorted(orders.items(), key=lambda x: x[1]["ask"])
+        bestex = orders[0][0]
+        bestask = orders[0][1]["ask"]
+
+        return (bestex, bestask)
+
+    def get_best_bid(self, symbol, exchanges=None):
+        orders = self.get_all_ex_bid_ask(symbol, exchanges=exchanges)
+        orders = sorted(orders.items(), key=lambda x: x[1]["bid"], reverse=True)
+        bestex = orders[0][0]
+        bestbid = orders[0][1]["bid"]
+
+        return (bestex, bestbid)
+
     def get_ohlcv(self, exchange, symbol, freq="1d", since=None):
         ex = self.exchanges[exchange]
         if not ex.has["fetchOHLCV"]:
