@@ -7,22 +7,26 @@ import os
 import sys
 import time
 
-from TraderBetty import betty
+from TraderBetty.managers import config, handlers, data, portfolio
 
 
 here = os.path.abspath("TraderBetty/TraderBetty")
 root = os.path.dirname(here)
-config = os.path.join(root, "config.ini")
-keys_file = os.path.join(root, "keys.json")
+CONF = os.path.join(root, "config.ini")
+KEYS = os.path.join(root, "keys.json")
 
 # TODO: include possibility to input api and config path
-trader = betty.Trader(config_path=config, api_path=keys_file)
+connection_conf = config.ConnectionConfigLoader
+full_conf = config.FullConfigLoader
+
+CH = handlers.ConnectionHandler(CONF, connection_conf, KEYS)
 
 
 def main(sleeptime=10):
+    PM = portfolio.PortfolioManager(CH, CONF, full_conf)
     try:
         while True:
-            trader.on_ex_arb_trade("BTC")
+            pass
             time.sleep(sleeptime)
     except KeyboardInterrupt:
         pass
