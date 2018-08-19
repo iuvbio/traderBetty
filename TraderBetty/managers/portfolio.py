@@ -181,6 +181,7 @@ class PortfolioManager(DataManager):
             columns=["timestamp", "open", "high", "low", "close", "volume"])
         ohlcvdf["datetime"] = ohlcvdf["timestamp"].apply(
             lambda d: dt.datetime.fromtimestamp(int(d / 1000)))
+        self.update_ohlcv(exchange, symbol, freq, ohlcvdf)
         return ohlcvdf
 
     # -------------------------------------------------------------------------

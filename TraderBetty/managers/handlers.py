@@ -127,7 +127,9 @@ class DataHandler(Handler):
         self.ohlcvs = {ex: {} for ex in self.exchanges}
         for ex in self.ohlcvs:
             ex_files = [f for f in all_ohlcvs if ex in f]
-            symbols = ["/".join([s.split("_")[-3], s.split("_")[-2]]) for
+            symbols = ["/".join([s.split("_")[-3],
+                                 s.split("_")[-2] +
+                                 s.split("_")[-1].split(".")[0]]) for
                        s in ex_files]
             ex_ohlcvs = [pd.read_csv(
                 self.OHLCV_PATH + "/" + f,

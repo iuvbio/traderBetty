@@ -64,18 +64,19 @@ class DataManager(DataHandler):
         self.order_books[exchange][symbol] = exobdf.copy()
         self.store_csv(exobdf, path)
 
-    def update_ohlcv(self, exchange, symbol, ohlcv, freq):
+    def update_ohlcv(self, exchange, symbol, freq, ohlcv):
         path = "{:s}/ohlcv_{:s}_{:s}_{:s}.csv".format(
             self.OHLCV_PATH, exchange, symbol.replace("/", "_"), freq)
         if not os.path.isfile(path):
-            self.ohlcvs[exchange][symbol] = pd.DataFrame(
-                columns=["timestamp", "open", "high", "low", "close", "volume"])
-            self.store_csv(self.ohlcvs[exchange][symbol], path)
-        ohlcvdf = self.ohlcvs[exchange][symbol].copy()
+            self.ohlcvs[exchange][symbol + freq] = pd.DataFrame(
+                columns=["datetime", "timestamp", "open", "high", "low",
+                         "close", "volume"])
+            self.store_csv(self.ohlcvs[exchange][symbol + freq], path)
+        ohlcvdf = self.ohlcvs[exchange][symbol + freq].copy()
         if not ohlcvdf.index.name == "datetime":
             ohlcvdf.index = pd.DatetimeIndex(ohlcvdf["datetime"])
-        ohlcvdf.combine_first(
+        ohlcvdf = ohlcvdf.combine_first(
             ohlcv.set_index("datetime")
         )
-        self.ohlcvs[exchange][symbol] = ohlcvdf.copy()
+        self.ohlcvs[exchange][symbol + freq] = ohlcvdf.copy()
         self.store_csv(ohlcvdf, path)
