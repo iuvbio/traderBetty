@@ -72,6 +72,7 @@ class DataHandler(Handler):
         self.BALANCE_PATH = self.DATA_PATH + "/balances.csv"
         self.TRADES_PATH = self.DATA_PATH + "/trades.csv"
         self.ORDERBOOK_PATH = self.DATA_PATH + "/order_books"
+        self.OHLCV_PATH = self.DATA_PATH + "/ohlcv"
         self.coins = self.config_loader.coins
         self.exchanges = self.config_loader.exchanges
         self.wallets = self.config_loader.wallets
@@ -107,16 +108,32 @@ class DataHandler(Handler):
         self.exprices = {exchange: self._load_ex_prices(exchange) for
                          exchange in self.exchanges}
 
-        allOrderBooks = [f for f in os.listdir(self.ORDERBOOK_PATH) if
+        all_order_books = [f for f in os.listdir(self.ORDERBOOK_PATH) if
                          os.path.isfile(self.ORDERBOOK_PATH + "/" + f)]
         self.order_books = {ex: {} for ex in self.exchanges}
         for ex in self.order_books:
-            ex_files = [f for f in allOrderBooks if ex in f]
+            ex_files = [f for f in all_order_books if ex in f]
+            symbols = [
+                "/".join([s.split("_")[-2], s.split("_")[-1].split(".")[0]])
+                for s in ex_files]
             ex_books = [pd.read_csv(
-                f, sep=";", parse_dates=True, index_col=["datetime"]
+                self.ORDERBOOK_PATH + "/" + f,
+                sep=";", parse_dates=True, index_col=["datetime"]
             ) for f in ex_files]
-            symbols = [s.split("_")[-1].split(".")[0] for s in ex_files]
             self.order_books[ex] = {s: ob for s, ob in zip(symbols, ex_books)}
+
+        all_ohlcvs = [f for f in os.listdir(self.OHLCV_PATH) if
+                      os.path.isfile(self.OHLCV_PATH + "/" + f)]
+        self.ohlcvs = {ex: {} for ex in self.exchanges}
+        for ex in self.ohlcvs:
+            ex_files = [f for f in all_ohlcvs if ex in f]
+            symbols = ["/".join([s.split("_")[-3], s.split("_")[-2]]) for
+                       s in ex_files]
+            ex_ohlcvs = [pd.read_csv(
+                self.OHLCV_PATH + "/" + f,
+                sep=";", parse_dates=True, index_col=["datetime"]
+            ) for f in ex_files]
+            self.ohlcvs[ex] = {s: ohlcv for s, ohlcv in zip(symbols, ex_ohlcvs)}
 
     def _load_balances(self):
         try:

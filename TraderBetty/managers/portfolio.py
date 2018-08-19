@@ -167,6 +167,7 @@ class PortfolioManager(DataManager):
         if not ob["timestamp"]:
             ob["timestamp"] = calendar.timegm(dt.datetime.now().timetuple())
         obdf = pd.DataFrame(ob)
+        self.update_order_book(exchange, symbol, obdf)
         return obdf
 
     def get_ohlcv(self, exchange, symbol, freq="1d", since=None):
@@ -174,7 +175,13 @@ class PortfolioManager(DataManager):
         if not ex.has["fetchOHLCV"]:
             print("{:s} doesn't support fetch_ohlcv().".format(ex))
             return None
-        return ex.fetch_ohlcv(symbol, freq, since=since)
+        ohlcv = ex.fetch_ohlcv(symbol, freq, since=since)
+        ohlcvdf = pd.DataFrame(
+            ohlcv,
+            columns=["timestamp", "open", "high", "low", "close", "volume"])
+        ohlcvdf["datetime"] = ohlcvdf["timestamp"].apply(
+            lambda d: dt.datetime.fromtimestamp(int(d / 1000)))
+        return ohlcvdf
 
     # -------------------------------------------------------------------------
     # Price calculation methods
