@@ -1,4 +1,5 @@
 """Provides all data management methods."""
+import os
 import pandas as pd
 
 from TraderBetty.managers.handlers import DataHandler
@@ -49,3 +50,15 @@ class DataManager(DataHandler):
 
     def update_order_book(self, exchange, symbol, order_book):
         path = "{:s}/order_book_{:s}_{:s}".format(self.ORDERBOOK_PATH, exchange, symbol)
+        if not os.path.isfile(path):
+            self.order_books[exchange][symbol] = pd.DataFrame(
+                columns=["bids", "asks", "timestamp", "datetime", "none"])
+            self.store_csv(self.order_books[exchange][symbol], path)
+        exobdf = self.order_books[exchange][symbol].copy()
+        if not exobdf.index.name == "datetime":
+            exobdf.set_index("datetime", inplace=True)
+        exobdf = exobdf.comine_first(
+            order_book.set_index("datetime")
+        )
+        self.order_books[exchange][symbol] = exobdf.copy()
+        self.store_csv(exobdf, path)

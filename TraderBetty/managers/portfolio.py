@@ -4,6 +4,7 @@ import json
 from json.decoder import JSONDecodeError
 import time
 import datetime as dt
+import calendar
 import itertools
 
 import pandas as pd
@@ -160,7 +161,13 @@ class PortfolioManager(DataManager):
         if not ex.has["fetchOrderBook"]:
             print("{:s} doesn't support fetch_order_book().")
             return None
-        return ex.fetch_order_book(symbol)
+        ob = ex.fetch_order_book(symbol)
+        if not ob["datetime"]:
+            ob["datetime"] = dt.datetime.now()
+        if not ob["timestamp"]:
+            ob["timestamp"] = calendar.timegm(dt.datetime.now().timetuple())
+        obdf = pd.DataFrame(ob)
+        return obdf
 
     def get_ohlcv(self, exchange, symbol, freq="1d", since=None):
         ex = self.exchanges[exchange]
