@@ -111,7 +111,10 @@ class DataHandler(Handler):
                          os.path.isfile(self.ORDERBOOK_PATH + "/" + f)]
         self.order_books = {ex: {} for ex in self.exchanges}
         for ex in self.order_books:
-            ex_books = [f for f in allOrderBooks if ex in f]
+            ex_files = [f for f in allOrderBooks if ex in f]
+            ex_books = [pd.read_csv(f, sep=";") for f in ex_files]
+            symbols = [s.split("_")[-1].split(".")[0] for s in ex_files]
+            self.order_books[ex] = {s: ob for s, ob in zip(symbols, ex_books)}
 
     def _load_balances(self):
         try:
