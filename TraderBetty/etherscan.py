@@ -3,18 +3,15 @@ import os
 import json
 from configparser import ConfigParser
 import requests
-import pandas as pd
-from bs4 import BeautifulSoup
 
 # base url for own scrape
 BASE_URL = "https://api.etherscan.io/api"
 MODULE = "account"
-API_KEY = "2T34JM3AT6MUHK26WPMCQ17XEBGMTWQUXU"
 PATH = "data"
 
 
 class Scanner:
-    def __init__(self, configfile):
+    def __init__(self, configfile, key_file):
         self.session = requests.Session()
 
         self.config = ConfigParser()
@@ -24,6 +21,15 @@ class Scanner:
 
         self.config.read(configfile)
         self.config_addresses = self.config.get('ether_wallet', 'addresses').split(',')
+
+        API_KEY = self._get_api_key(key_file)
+
+    def _get_api_key(self, key_file):
+        # Load the api keys from keys file
+        with open(key_file) as file:
+            keys = json.load(file)
+        api_key = keys["etherscan"]["apiKey"]
+        return api_key
 
     def check_balance(self):
         addresses = self.config_addresses
