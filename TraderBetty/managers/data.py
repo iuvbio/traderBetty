@@ -25,7 +25,7 @@ class DataManager(DataHandler):
         if not extradesdf.index.names == ["exchange", "id"]:
             extradesdf.set_index(["exchange", "id"], inplace=True)
         extradesdf = extradesdf.combine_first(
-            extrades.set_index(["exchange", "id"])  # drop=False
+            extrades.set_index(["exchange", "id"])
         )
         self.extrades[exchange] = extradesdf.copy()
         self.store_csv(extradesdf, extr_path)
@@ -35,7 +35,7 @@ class DataManager(DataHandler):
         if not tradesdf.index.names == ["exchange", "id"]:
             tradesdf.set_index(["exchange", "id"], inplace=True)
         tradesdf = tradesdf.combine_first(
-            extrades.set_index(["exchange", "id"])  # drop=False
+            extrades.set_index(["exchange", "id"])
         )
         self.trades = tradesdf.copy()
         self.store_csv(tradesdf, self.TRADES_PATH)
