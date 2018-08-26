@@ -20,9 +20,10 @@ class Scanner:
             raise ValueError
 
         self.config.read(configfile)
-        self.config_addresses = self.config.get('ether_wallet', 'addresses').split(',')
+        self.config_addresses = self.config.get(
+            'ether_wallet', 'addresses').split(',')
 
-        API_KEY = self._get_api_key(key_file)
+        self.API_KEY = self._get_api_key(key_file)
 
     def _get_api_key(self, key_file):
         # Load the api keys from keys file
@@ -42,9 +43,10 @@ class Scanner:
         else:
             action = "balance"
             addresses = addresses[0]
-        url = BASE_URL + (
-            "?module={0:s}&action={1:s}&address={2:s}&tag=latest&apikey={3:s}".
-                format(MODULE, action, addresses, API_KEY)
+        modact = "?module={:s}&action={:s}".format(MODULE, action)
+        url = BASE_URL + modact + (
+            "&address={:s}&tag=latest&apikey={:s}".format(
+                addresses, self.API_KEY)
         )
         r = self.session.get(url)
         content = r.content.decode('utf-8', 'ignore')

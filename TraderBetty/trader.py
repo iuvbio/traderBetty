@@ -10,8 +10,10 @@ class Trader():
     def trade(self):
         self._trading_strategy.trade()
 
-    def calc_profit(self):
-        self._trading_strategy.calc_profit()
+    def calc_profit(self, q1q2, q2q1, prbq1, prbq2, buyfee, sellfee, convfee,
+                    amount=1):
+        self._trading_strategy.calc_profit(q1q2, q2q1, prbq1, prbq2, buyfee,
+                                           sellfee, convfee, amount=1)
 
     def limit_buy_order(self, exchange, symbol, amount, price):
         ex = self.exchanges[exchange]
@@ -38,6 +40,7 @@ class ArbitrageTrader(Trader):
 
     def get_data(self, exchange, base, quote1, quote2):
         # Get the conversion rate for quote1 to quote2
+        convfee = 0.0025
         if quote1 == "USD" and quote2 == "EUR":
             q2q1 = self.PM.c.get_rate("EUR", "USD")
             q1q2 = self.PM.c.get_rate("USD", "EUR")
@@ -45,34 +48,30 @@ class ArbitrageTrader(Trader):
             q2q1 = self.PM.c.get_rate("USD", "EUR")
             q1q2 = self.PM.c.get_rate("EUR", "USD")
         else:
-            order = self.PM.get_best_order(exchange, "/".join([quote2, quote1]))
+            symbol = "/".join([quote2, quote1])
+            order = self.PM.get_best_order(exchange, symbol)
             q2q1 = order.get("bid")
             q1q2 = 1 / order.get("ask")
+            convfee = self.PM.exchanges[exchange].market(symbol).get("taker")
         # Get base price in quote1 at which we buy
         symbol = "/".join([base, quote1])
         prbq1 = self.PM.get_best_order(exchange, symbol).get("ask")
-        # Get value of that price in quote2
-        conv_prbq2 = prbq1 * q1q2
         # Get the trading fee for buying
         market = self.PM.exchanges[exchange].market(symbol)
         buyfee = market.get("taker")
         # Get base price in quote2 at which we sell
         symbol = "/".join([base, quote2])
         prbq2 = self.PM.get_best_order(exchange, symbol).get("bid")
-        # Get value of that price in quote1
-        conv_prbq1 = prbq2 * q2q1
         # Get trading fee for selling
         market = self.PM.exchanges[exchange].market(symbol)
         sellfee = market.get("taker")
-        # Calculate profit
-        spread_q1 = conv_prbq1 - prbq1
-        spread_q2 = prbq2 - conv_prbq2
         arb_dict = {
+            "q2q1": q2q1,
+            "q1q2": q1q2,
             "prbq1": prbq1,
-            "conv_prq2": conv_prbq2,
             "prbq2": prbq2,
-            "conv_prbq1": conv_prbq1,
-            "spread_q1": spread_q1,
-            "spread_q2": spread_q2
+            "buyfee": buyfee,
+            "sellfee": sellfee,
+            "convfee": convfee
         }
         return arb_dict

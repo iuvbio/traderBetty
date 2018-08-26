@@ -32,12 +32,7 @@ class DataManager(DataHandler):
         self.store_csv(extradesdf, extr_path)
 
         # Update all trades
-        tradesdf = self.trades.copy()
-        if not tradesdf.index.names == ["exchange", "id"]:
-            tradesdf.set_index(["exchange", "id"], inplace=True)
-        tradesdf = tradesdf.combine_first(
-            extrades.set_index(["exchange", "id"])
-        )
+        tradesdf = pd.concat([self.extrades[ex] for ex in self.exchanges])
         self.trades = tradesdf.copy()
         self.store_csv(tradesdf, self.TRADES_PATH)
 
