@@ -57,7 +57,7 @@ class PortfolioManager(DataManager):
             self.updates[ex.id]["balance"] = dt.datetime.today()
         return balance
 
-    def get_trades(self, exchange, since=None, store=True):
+    def get_trades(self, exchange, since=None):
         ex = self.exchanges[exchange]
         try:
             trades = ex.fetch_my_trades(since=since)
@@ -159,15 +159,17 @@ class PortfolioManager(DataManager):
     def get_order_book(self, exchange, symbol):
         ex = self.exchanges[exchange]
         if not ex.has["fetchOrderBook"]:
-            print("{:s} doesn't support fetch_order_book().")
+            print("{:s} doesn't support fetch_order_book().".format(exchange))
+            return None
+        if not symbol in ex.symbols:
+            print("{:s} not available on {:s}.".format(symbol, exchange))
             return None
         ob = ex.fetch_order_book(symbol)
         if not ob["datetime"]:
             ob["datetime"] = dt.datetime.now()
         if not ob["timestamp"]:
             ob["timestamp"] = calendar.timegm(dt.datetime.now().timetuple())
-        obdf = pd.DataFrame(ob)
-        self.update_order_book(exchange, symbol, obdf)
+        self.update_order_book(exchange, symbol, ob)
         return ob
 
     def get_best_order(self, exchange, symbol, verbose=False):
@@ -186,7 +188,8 @@ class PortfolioManager(DataManager):
         orders = {}
         for exchange in exchanges:
             ex = self.exchanges[exchange]
-            orders[exchange] = self.get_best_order(ex.id, symbol) if symbol in ex.symbols else None
+            if symbol in ex.symbols:
+                orders[exchange] = self.get_best_order(ex.id, symbol)
         return orders
 
     def get_best_ask(self, symbol, exchanges=None):

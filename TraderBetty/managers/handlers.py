@@ -113,14 +113,24 @@ class DataHandler(Handler):
         self.order_books = {ex: {} for ex in self.exchanges}
         for ex in self.order_books:
             ex_files = [f for f in all_order_books if ex in f]
-            symbols = [
-                "/".join([s.split("_")[-2], s.split("_")[-1].split(".")[0]])
-                for s in ex_files]
             ex_books = [pd.read_csv(
-                self.ORDERBOOK_PATH + "/" + f,
-                sep=";", parse_dates=True, index_col=["datetime"]
+                self.ORDERBOOK_PATH + "/" + f, sep=";"
             ) for f in ex_files]
-            self.order_books[ex] = {s: ob for s, ob in zip(symbols, ex_books)}
+            symbols = list(set([
+                "/".join([s.split("_")[-3], s.split("_")[-2]])
+                for s in ex_files]))
+            self.order_books[ex] = {s: [] for s in symbols}
+            for symbol in symbols:
+                symb_files = [f for f in ex_files if
+                              symbol.replace("/", "_") in f]
+                symb_books = [pd.read_csv(
+                    self.ORDERBOOK_PATH + "/" + f, sep=";"
+                ) for f in symb_files]
+                timestamps = [ts.split(".")[0] for ts in ex_files if
+                              symbol.replace("/", "_") in ts]
+                self.order_books[ex][symbol] = {
+                    ts: sb for ts, sb in zip(timestamps, symb_books)
+                }
 
         all_ohlcvs = [f for f in os.listdir(self.OHLCV_PATH) if
                       os.path.isfile(self.OHLCV_PATH + "/" + f)]

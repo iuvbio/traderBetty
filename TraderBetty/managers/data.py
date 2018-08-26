@@ -6,6 +6,7 @@ from TraderBetty.managers.handlers import DataHandler
 
 
 class DataManager(DataHandler):
+    # TODO: Move all DataFrame conversions to data
     def update_balance(self, column, balance):
         balance = pd.Series(balance, name=column)
         self.balances[column] = balance
@@ -49,18 +50,19 @@ class DataManager(DataHandler):
         self.store_csv(pricedf, expr_path)
 
     def update_order_book(self, exchange, symbol, order_book):
-        path = "{:s}/orderbook_{:s}_{:s}.csv".format(
-            self.ORDERBOOK_PATH, exchange, symbol.replace("/", "_"))
+        ts = order_book.get("timestamp")
+        path = "{:s}/orderbook_{:s}_{:s}_{:d}.csv".format(
+            self.ORDERBOOK_PATH, exchange, symbol.replace("/", "_"), ts)
         if not os.path.isfile(path):
             self.order_books[exchange][symbol] = pd.DataFrame(
-                columns=["bids", "asks", "timestamp", "datetime", "none"])
+                columns=[("asks", "price"), ("asks", "volume"),
+                         ("bids", "price"), ("bids", "volume")])
             self.store_csv(self.order_books[exchange][symbol], path)
-        exobdf = self.order_books[exchange][symbol].copy()
-        if not exobdf.index.name == "datetime":
-            exobdf.set_index("datetime", inplace=True)
-        exobdf = exobdf.comine_first(
-            order_book.set_index("datetime")
-        )
+        asksdf = pd.DataFrame(order_book.get("asks"),
+                              columns=[("asks", "price"), ("asks", "volume")])
+        bidsdf = pd.DataFrame(order_book.get("bids"),
+                              columns=[("bids", "price"), ("bids", "volume")])
+        exobdf = pd.concat([asksdf, bidsdf], axis=1)
         self.order_books[exchange][symbol] = exobdf.copy()
         self.store_csv(exobdf, path)
 
