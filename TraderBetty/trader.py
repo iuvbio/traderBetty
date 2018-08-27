@@ -10,10 +10,9 @@ class Trader():
     def trade(self):
         self._trading_strategy.trade()
 
-    def calc_profit(self, q1q2, q2q1, prbq1, prbq2, buyfee, sellfee, convfee,
-                    amount=1):
-        self._trading_strategy.calc_profit(q1q2, q2q1, prbq1, prbq2, buyfee,
-                                           sellfee, convfee, amount=1)
+    def calc_profit(self, arb_dict, amount=1):
+        profit = self._trading_strategy.calc_profit(arb_dict, amount)
+        return profit
 
     def limit_buy_order(self, exchange, symbol, amount, price):
         ex = self.exchanges[exchange]

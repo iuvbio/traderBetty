@@ -1,7 +1,7 @@
 """Provides the portfolio manager class"""
 import os
 import json
-from json.decoder import JSONDecodeError
+#from json.decoder import JSONDecodeError
 import time
 import datetime as dt
 import calendar
@@ -130,7 +130,6 @@ class PortfolioManager(DataManager):
                 if tickers:
                     lp = tickers.get(symbol, None)
                     lp = lp["last"] if lp else None
-                    # There could be a problem here if called for a symbol that's not in my coins
                     self.update_ex_price(exchange, symbol, lp)
                 else:
                     self.get_last_price(exchange, symbol, verbose=False)
@@ -161,7 +160,7 @@ class PortfolioManager(DataManager):
         if not ex.has["fetchOrderBook"]:
             print("{:s} doesn't support fetch_order_book().".format(exchange))
             return None
-        if not symbol in ex.symbols:
+        if symbol not in ex.symbols:
             print("{:s} not available on {:s}.".format(symbol, exchange))
             return None
         ob = ex.fetch_order_book(symbol)
@@ -201,7 +200,8 @@ class PortfolioManager(DataManager):
 
     def get_best_bid(self, symbol, exchanges=None):
         orders = self.get_all_ex_bid_ask(symbol, exchanges=exchanges)
-        orders = sorted(orders.items(), key=lambda x: x[1]["bid"], reverse=True)
+        orders = sorted(
+            orders.items(), key=lambda x: x[1]["bid"], reverse=True)
         bestex = orders[0][0]
         bestbid = orders[0][1]["bid"]
         return bestex, bestbid
@@ -229,7 +229,8 @@ class PortfolioManager(DataManager):
         for ex in self.exchanges:
             all_symbols += self.exchanges[ex].symbols
         all_symbols = set(all_symbols)
-        conv_dict = {quote: base + "/" + quote in all_symbols for quote in quotes}
+        conv_dict = {
+            quote: base + "/" + quote in all_symbols for quote in quotes}
         return conv_dict
 
     def convert_coin(self, base, quote="BTC", amount=1):
@@ -250,7 +251,8 @@ class PortfolioManager(DataManager):
         else:
             secval = self.convert_coin(base, quote=secondary_quote,
                                        amount=amount)
-            value = self.convert_coin(secondary_quote, quote=quote, amount=secval)
+            value = self.convert_coin(secondary_quote, quote=quote,
+                                      amount=secval)
         return value
 
     def get_ttl_btcvalue(self):

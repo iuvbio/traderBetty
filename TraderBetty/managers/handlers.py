@@ -82,8 +82,8 @@ class DataHandler(Handler):
         if not os.path.isfile(self.BALANCE_PATH):
             balances = pd.DataFrame(
                 index=self.coins,
-                columns=list(self.exchanges) +
-                        ["total", "btc_value", "eur_value"])
+                columns=list(self.exchanges) + (
+                        ["total", "btc_value", "eur_value"]))
             self.store_csv(balances, self.BALANCE_PATH)
         if not os.path.isfile(self.TRADES_PATH):
             trades = pd.DataFrame(columns=[
@@ -108,14 +108,11 @@ class DataHandler(Handler):
         self.exprices = {exchange: self._load_ex_prices(exchange) for
                          exchange in self.exchanges}
 
-        all_order_books = [f for f in os.listdir(self.ORDERBOOK_PATH) if
-                         os.path.isfile(self.ORDERBOOK_PATH + "/" + f)]
+        all_order_books = [f for f in os.listdir(self.ORDERBOOK_PATH) if (
+                         os.path.isfile(self.ORDERBOOK_PATH + "/" + f))]
         self.order_books = {ex: {} for ex in self.exchanges}
         for ex in self.order_books:
             ex_files = [f for f in all_order_books if ex in f]
-            ex_books = [pd.read_csv(
-                self.ORDERBOOK_PATH + "/" + f, sep=";"
-            ) for f in ex_files]
             symbols = list(set([
                 "/".join([s.split("_")[-3], s.split("_")[-2]])
                 for s in ex_files]))
@@ -138,14 +135,15 @@ class DataHandler(Handler):
         for ex in self.ohlcvs:
             ex_files = [f for f in all_ohlcvs if ex in f]
             symbols = ["/".join([s.split("_")[-3],
-                                 s.split("_")[-2] +
-                                 s.split("_")[-1].split(".")[0]]) for
+                                 s.split("_")[-2]
+                                 + s.split("_")[-1].split(".")[0]]) for
                        s in ex_files]
             ex_ohlcvs = [pd.read_csv(
                 self.OHLCV_PATH + "/" + f,
                 sep=";", parse_dates=True, index_col=["datetime"]
             ) for f in ex_files]
-            self.ohlcvs[ex] = {s: ohlcv for s, ohlcv in zip(symbols, ex_ohlcvs)}
+            self.ohlcvs[ex] = {
+                s: ohlcv for s, ohlcv in zip(symbols, ex_ohlcvs)}
 
     def _load_balances(self):
         try:
@@ -166,7 +164,8 @@ class DataHandler(Handler):
 
     def _load_ex_trades(self, exchange):
         try:
-            trades = pd.read_csv("%s/trades_%s.csv" % (self.DATA_PATH, exchange),
+            trades = pd.read_csv("{:s}/trades_{:s}.csv".format(
+                self.DATA_PATH, exchange),
                                  sep=";",
                                  parse_dates=["date", "datetime", "timestamp"],
                                  index_col=["exchange", "id"])
@@ -176,7 +175,8 @@ class DataHandler(Handler):
 
     def _load_ex_prices(self, exchange):
         try:
-            prices = pd.read_csv("%s/prices_%s.csv" % (self.DATA_PATH, exchange),
+            prices = pd.read_csv("{:s}/prices_{:s}.csv".format(
+                self.DATA_PATH, exchange),
                                  sep=";", index_col=0)
             return prices
         except FileNotFoundError:
