@@ -161,7 +161,8 @@ class PortfolioManager(DataManager):
             print("{:s} doesn't support fetch_order_book().".format(exchange))
             return None
         if symbol not in ex.symbols:
-            print("{:s} not available on {:s}.".format(symbol, exchange))
+            # do some logging here instead
+            # print("{:s} not available on {:s}.".format(symbol, exchange))
             return None
         ob = ex.fetch_order_book(symbol)
         if not ob["datetime"]:
@@ -173,6 +174,9 @@ class PortfolioManager(DataManager):
 
     def get_best_order(self, exchange, symbol, verbose=False):
         orderbook = self.get_order_book(exchange, symbol)
+        if not orderbook:
+            # do some logging
+            return {}
         bid = orderbook['bids'][0][0] if len(orderbook['bids']) > 0 else None
         ask = orderbook['asks'][0][0] if len(orderbook['asks']) > 0 else None
         spread = (ask - bid) if (bid and ask) else None

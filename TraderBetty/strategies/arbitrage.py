@@ -17,26 +17,33 @@ class OnExchangeArbitrageStrategy(ArbitrageStrategyAbstract):
         print("I trade sometimes")
 
     def calc_profit(self, arb_dict, amount=1):
+        if not arb_dict:
+            return None
         # Buy amount of base for quote1
         cost = amount * arb_dict.get("prbq1")
-        cost += cost * arb_dict.get("buyfee")
         # Get equivalent amount of quote2 if bought for cost
         costq2equiv = cost * arb_dict.get("q1q2")
-        costq2equiv -= costq2equiv * arb_dict.get("convfee")
         # Sell amount of base for quote2
         income = amount * arb_dict.get("prbq2")
-        income -= income * arb_dict.get("sellfee")
         # Get equivalent amount of quote1 if income sold
         incq1equiv = income * arb_dict.get("q2q1")
+        # Apply trading fees
+        cost += cost * arb_dict.get("buyfee")
+        costq2equiv += costq2equiv * arb_dict.get("convfee")
+        income -= income * arb_dict.get("sellfee")
         incq1equiv -= incq1equiv * arb_dict.get("convfee")
-        spread_q1 = income - costq2equiv
-        spread_q2 = incq1equiv - cost
+        # Calculate the profit
+        profitq1 = income - costq2equiv
+        profitq2 = incq1equiv - cost
         profit_dict = {
+            "base": arb_dict.get("base"),
+            "buyin": arb_dict.get("quote1"),
+            "sellin": arb_dict.get("quote2"),
             "cost": cost,
             "costq2": costq2equiv,
-            "income": income,
-            "inq1": incq1equiv,
-            "spread_q1": spread_q1,
-            "spread_q2": spread_q2
+            "inc": income,
+            "incq1": incq1equiv,
+            "profitq1": profitq1,
+            "profitq2": profitq2
         }
         return profit_dict

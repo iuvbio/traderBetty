@@ -38,6 +38,7 @@ class ArbitrageTrader(Trader):
         super().__init__(portfolio_manager, strategy)
 
     def get_data(self, exchange, base, quote1, quote2):
+        sq2q1 = "/".join([quote2, quote1])
         # Get the conversion rate for quote1 to quote2
         convfee = 0.0025
         if quote1 == "USD" and quote2 == "EUR":
@@ -47,24 +48,26 @@ class ArbitrageTrader(Trader):
             q2q1 = self.PM.c.get_rate("USD", "EUR")
             q1q2 = self.PM.c.get_rate("EUR", "USD")
         else:
-            symbol = "/".join([quote2, quote1])
-            order = self.PM.get_best_order(exchange, symbol)
-            q2q1 = order.get("bid")
-            q1q2 = 1 / order.get("ask")
-            convfee = self.PM.exchanges[exchange].market(symbol).get("taker")
+            order = self.PM.get_best_order(exchange, sq2q1)
+            q2q1 = order.get("bid", 0)
+            q1q2 = 1 / order.get("ask", 0)
+            convfee = self.PM.exchanges[exchange].market(sq2q1).get("taker", 0)
         # Get base price in quote1 at which we buy
-        symbol = "/".join([base, quote1])
-        prbq1 = self.PM.get_best_order(exchange, symbol).get("ask")
+        sbq1 = "/".join([base, quote1])
+        prbq1 = self.PM.get_best_order(exchange, sbq1).get("ask", 0)
         # Get the trading fee for buying
-        market = self.PM.exchanges[exchange].market(symbol)
-        buyfee = market.get("taker")
+        market = self.PM.exchanges[exchange].market(sbq1) if prbq1 else {}
+        buyfee = market.get("taker", 0)
         # Get base price in quote2 at which we sell
-        symbol = "/".join([base, quote2])
-        prbq2 = self.PM.get_best_order(exchange, symbol).get("bid")
+        sbq2 = "/".join([base, quote2])
+        prbq2 = self.PM.get_best_order(exchange, sbq2).get("bid", 0)
         # Get trading fee for selling
-        market = self.PM.exchanges[exchange].market(symbol)
-        sellfee = market.get("taker")
+        market = self.PM.exchanges[exchange].market(sbq2) if prbq2 else {}
+        sellfee = market.get("taker", 0)
         arb_dict = {
+            "base": base,
+            "quote1": quote1,
+            "quote2": quote2,
             "q2q1": q2q1,
             "q1q2": q1q2,
             "prbq1": prbq1,
