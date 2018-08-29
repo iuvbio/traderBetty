@@ -97,6 +97,14 @@ class PortfolioManager(DataManager):
         return self.trades
 
     # -------------------------------------------------------------------------
+    # Exchange data collection methods
+    # -------------------------------------------------------------------------
+    def get_quotes(self, exchange):
+        ex = self.exchanges[exchange]
+        quotes = list(set([q.split("/")[1] for q in ex.symbols if "/" in q]))
+        return quotes
+
+    # -------------------------------------------------------------------------
     # Price data collection methods
     # -------------------------------------------------------------------------
     def get_last_price(self, exchange, symbol, verbose=True):
@@ -155,6 +163,9 @@ class PortfolioManager(DataManager):
         bestprice = prices[0][1]
         return bestex, bestprice
 
+    # -------------------------------------------------------------------------
+    # Order data collection methods
+    # -------------------------------------------------------------------------
     def get_order_book(self, exchange, symbol):
         ex = self.exchanges[exchange]
         if not ex.has["fetchOrderBook"]:
@@ -210,6 +221,9 @@ class PortfolioManager(DataManager):
         bestbid = orders[0][1]["bid"]
         return bestex, bestbid
 
+    # -------------------------------------------------------------------------
+    # Historical data collection methods
+    # -------------------------------------------------------------------------
     def get_ohlcv(self, exchange, symbol, freq="1d", since=None):
         ex = self.exchanges[exchange]
         if not ex.has["fetchOHLCV"]:
