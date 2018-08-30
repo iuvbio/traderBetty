@@ -85,6 +85,9 @@ class ArbitrageTrader(Trader):
         diffq2q1rate = diffq2q1 / rq2q1
         diffq1q2rate = diffq1q2 / rq1q2
         arb_dict = {
+            "base": base,
+            "quote1": quote1,
+            "quote2": quote2,
             sbq1: bq1,
             sbq2: bq2,
             "iq2q1": iq2q1,
