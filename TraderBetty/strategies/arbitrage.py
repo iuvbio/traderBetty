@@ -19,15 +19,22 @@ class OnExchangeArbitrageStrategy(ArbitrageStrategyAbstract):
     def calc_profit(self, arb_dict, amount=None, q1=None, q2=None):
         if not arb_dict:
             return None
+        if amount and (q1 or q1):
+            # Some logging here
+            print("Specify either an amount to by or a cost in either quote currency.")
+            return None
         if q1:
-            amount = q1 / arb_dict["bq1"]["ask"]
+            # TODO: Add correct key to dict here
+            cost = q1
             buycurr = arb_dict["quote1"]
             sellcurr = arb_dict["quote2"]
         elif q2:
-            amount = q2 / arb_dict["bq2"]["ask"]
+            cost = q2
             buycurr = arb_dict["quote2"]
             sellcurr = arb_dict["quote1"]
         else:
+            cost = None
+            amount = amount if amount else 1
             buycurr = arb_dict["quote1"] if arb_dict["diffq2q1"] > 0 else (
                     arb_dict["quote2"]
             )
@@ -36,6 +43,7 @@ class OnExchangeArbitrageStrategy(ArbitrageStrategyAbstract):
         sell = "{:s}/{:s}".format(arb_dict["base"], sellcurr)
         conv = "{:s}/{:s}".format(sellcurr, buycurr)
         # Buy amount of base for quote1
+        amount = cost / arb_dict[buy]["ask"] if not amount else amount
         cost = amount * arb_dict[buy]["ask"]
         # Sell amount of base for quote2
         income = amount * arb_dict[sell]["bid"]
