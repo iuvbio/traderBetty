@@ -286,22 +286,20 @@ class PortfolioManager(DataManager):
         self.update_balance("btc_value", btcttls)
         return btcttls
 
-    def get_fiatvalue(self, coin, fiat="USD"):
-        ttls = self.balances["total"]
-        bal = ttls[coin]
+    def get_fiatvalue(self, coin, amount, fiat="USD"):
         conv_dict = self.is_convertible_to(coin)
         if conv_dict[fiat]:
-            fiatbal = self.convert_coin(coin, fiat, amount=bal)
+            fiatval = self.convert_coin(coin, fiat, amount=amount)
         elif conv_dict["USDT"]:
-            usdtbal = self.convert_coin(coin, "USDT", amount=bal)
-            fiatbal = self.convert_coin("USDT", "USD", amount=usdtbal)
+            usdtval = self.convert_coin(coin, "USDT", amount=amount)
+            fiatval = self.convert_coin("USDT", "USD", amount=usdtval)
         elif conv_dict["BTC"]:
-            btcbal = self.convert_coin(coin, "BTC", amount=bal)
-            fiatbal = self.convert_coin("BTC", "USD", amount=btcbal)
+            btcval = self.convert_coin(coin, "BTC", amount=amount)
+            fiatval = self.convert_coin("BTC", "USD", amount=btcval)
         else:
             print("{:s} cannot be converted to {:s}.".format(coin, fiat))
-            fiatbal = None
-        return fiatbal
+            fiatval = None
+        return fiatval
 
     def get_ttl_eurvalue(self):
         ttls = self.balances["total"]
@@ -310,7 +308,7 @@ class PortfolioManager(DataManager):
             bal = ttls[coin]
             eurbal = 0
             if bal > 0:
-                eurbal = self.get_fiatvalue(coin, fiat="EUR")
+                eurbal = self.get_fiatvalue(coin, bal, fiat="EUR")
             eurttls.append(eurbal)
         eurttls = pd.Series(eurttls, index=ttls.index)
         self.update_balance("eur_value", eurttls)

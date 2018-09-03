@@ -30,7 +30,6 @@ class DataManager(DataHandler):
         )
         self.extrades[exchange] = extradesdf.copy()
         self.store_csv(extradesdf, extr_path)
-
         # Update all trades
         tradesdf = pd.concat([self.extrades[ex] for ex in self.exchanges],
                              sort=False)

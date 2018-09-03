@@ -1,7 +1,7 @@
 """The trader class"""
 
 
-class Trader():
+class Trader:
     def __init__(self, portfolio_manager, strategy):
         self.PM = portfolio_manager
         self.exchanges = self.PM.exchanges
@@ -62,7 +62,7 @@ class ArbitrageTrader(Trader):
             eurusd = self.PM.c.get_rate("EUR", "USD")
             usdeur = self.PM.c.get_rate("USD", "EUR")
             rq2q1 = usdeur if quote1 == "EUR" else eurusd
-            rq1q2 = eurusd if quote1 =="EUR" else usdeur
+            rq1q2 = eurusd if quote1 == "EUR" else usdeur
         else:
             q2q1 = self.PM.get_best_order(
                 exchange, sq2q1) if sq2q1 in ex.symbols else None
