@@ -21,7 +21,7 @@ class OnExchangeArbitrageStrategy(ArbitrageStrategyAbstract):
             return None
         if amount and (q1 or q1):
             # Some logging here
-            print("Specify either an amount to by or a cost in either quote currency.")
+            print("Specify either an amount to buy or a cost in either quote currency.")
             return None
         if q1:
             # TODO: Add correct key to dict here
@@ -63,8 +63,13 @@ class OnExchangeArbitrageStrategy(ArbitrageStrategyAbstract):
         profit_dict = {
             "buy": buy,
             "sell": sell,
+            "amount": amount,
             "cost": cost,
             "inc": income_conv,
             "profit": profit,
         }
         return profit_dict
+
+    def is_profitable(self, profit_dict):
+        if profit_dict.get("profit") > 0:
+            return True

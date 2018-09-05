@@ -6,10 +6,13 @@ Main executable
 import os
 import sys
 import time
-
-from TraderBetty.managers import config, handlers, data, portfolio
-
-
+import argparse
+"""
+from TraderBetty.managers import config, handlers, portfolio
+from TraderBetty.strategies import arbitrage
+from TraderBetty import trader
+"""
+# Take care of paths
 here = os.path.abspath("TraderBetty/TraderBetty")
 root = os.path.dirname(here)
 CONF = os.path.join(root, "config.ini")
@@ -22,16 +25,26 @@ full_conf = config.FullConfigLoader
 CH = handlers.ConnectionHandler(CONF, connection_conf, KEYS)
 
 
-def main(sleeptime=10):
+def main():
     PM = portfolio.PortfolioManager(CH, CONF, full_conf)
+    strategy = arbitrage.OnExchangeArbitrageStrategy()
+    mytrader = trader.ArbitrageTrader(PM, strategy)
     try:
         while True:
-            pass
-            time.sleep(sleeptime)
+            delay = int(mytrader.exchanges["bitstamp"].rateLimit / 1000)
+            data = mytrader.get_data("bitstamp", "BTC", "EUR", "USD")
+            print(data)
+            time.sleep(delay)
     except KeyboardInterrupt:
         pass
 
 
 if __name__ == "__main__":
+    # Create an argument passer for command line usage
+    parser = argparse.ArgumentParser(description="TraderBetty will show you"
+                                                 "what you got and even trade"
+                                                 "for you!")
+    parser.add_argument("-c", "--config", default=CONF)
+    parser.add_argument("-k", "--keys", default=KEYS)
     status = main()
     sys.exit(status)
