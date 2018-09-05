@@ -7,13 +7,16 @@ class Trader:
         self.exchanges = self.PM.exchanges
         self._trading_strategy = strategy
 
-    def trade(self):
+    def trade(self, *args):
         self._trading_strategy.trade()
 
     def calc_profit(self, arb_dict, amount=None, q1=None, q2=None):
         profit = self._trading_strategy.calc_profit(arb_dict, amount=amount,
                                                     q1=q1, q2=q2)
         return profit
+
+    def is_profitable(self, profit_dict):
+        self._trading_strategy.is_profitable(profit_dict)
 
     def limit_buy_order(self, exchange, symbol, amount, price):
         ex = self.exchanges[exchange]
@@ -86,6 +89,7 @@ class ArbitrageTrader(Trader):
         diffq2q1rate = diffq2q1 / rq2q1
         diffq1q2rate = diffq1q2 / rq1q2
         arb_dict = {
+            "exchange": exchange,
             "base": base,
             "quote1": quote1,
             "quote2": quote2,
@@ -102,3 +106,16 @@ class ArbitrageTrader(Trader):
             "fees": fees
         }
         return arb_dict
+
+    def trade(self, arb_dict, profit_dict):
+        if not self.is_profitable(profit_dict):
+            return None
+        exchange = arb_dict["exchange"]
+        buy = profit_dict["buy"]
+        amount = profit_dict["amount"]
+        buyprice = arb_dict[buy]["ask"]
+        buyorder = self.limit_buy_order(exchange, buy, amount, buyprice)
+        # TODO: Add some logic here to wait until the order is filled before selling
+        sell = profit_dict["sell"]
+        sellprice = arb_dict[sell]["bid"]
+        sellorder = self.limit_sell_order(exchange, sell, amount, sellprice)
